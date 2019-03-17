@@ -29,7 +29,7 @@ class MicroService:
         self.sock.connect(self.server_address)
 
     def register(self):
-        reg = {"action": "register", "name": "echo"}
+        reg = {"action": "register", "name": self.name}
 
         self.send(reg)
 
