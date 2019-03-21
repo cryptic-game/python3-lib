@@ -4,7 +4,7 @@ The microservice-libary for python3 of cryptic-game.
 
 ## Quick-Start
 
-Here are 11 lines of code for your first echo microservice:
+Here are 15 lines of code for your first echo microservice:
 
 ```python
 from cryptic import MicroService
@@ -15,8 +15,12 @@ def handle(endpoint, data):
     return data
 
 
+def handle_ms(ms, data):
+    print(ms, data)
+
+
 if __name__ == '__main__':
-    m = MicroService('echo', handle)
+    m = MicroService('echo', handle, handle_ms, True)
     m.run()
 ```
 

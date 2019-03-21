@@ -6,9 +6,11 @@ from os import environ
 class MicroService:
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
-    def __init__(self, name, handle):
+    def __init__(self, name, handle, handle_ms, auth):
         self.name = name
         self.handle = handle
+        self.handle_ms = handle_ms
+        self.auth = auth
 
         host = '127.0.0.1'
         port = 1239
@@ -29,7 +31,7 @@ class MicroService:
         self.sock.connect(self.server_address)
 
     def register(self):
-        reg = {"action": "register", "name": self.name}
+        reg = {"action": "register", "name": self.name, "auth": self.auth}
 
         self.send(reg)
 
@@ -40,13 +42,19 @@ class MicroService:
             if not frame:
                 break
 
-            tag = frame["tag"]
             data = frame["data"]
-            endpoint = frame["endpoint"]
 
-            response = {"tag": tag, "data": self.handle(endpoint, data)}
+            if "tag" in frame:
+                tag = frame["tag"]
+                endpoint = frame["endpoint"]
 
-            self.send(response)
+                response = {"tag": tag, "data": self.handle(endpoint, data)}
+
+                self.send(response)
+            else:
+                ms = frame["ms"]
+
+                self.handle_ms(ms, data)
 
     def stop(self):
         self.sock.close()
