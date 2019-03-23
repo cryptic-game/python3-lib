@@ -1,16 +1,16 @@
 import socket
 import json
 from os import environ
+from uuid import uuid4
 
 
 class MicroService:
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
-    def __init__(self, name, handle, handle_ms, auth):
+    def __init__(self, name, handle, handle_ms):
         self.name = name
         self.handle = handle
         self.handle_ms = handle_ms
-        self.auth = auth
 
         host = '127.0.0.1'
         port = 1239
@@ -31,7 +31,7 @@ class MicroService:
         self.sock.connect(self.server_address)
 
     def register(self):
-        reg = {"action": "register", "name": self.name, "auth": self.auth}
+        reg = {"action": "register", "name": self.name}
 
         self.send(reg)
 
@@ -47,14 +47,16 @@ class MicroService:
             if "tag" in frame:
                 tag = frame["tag"]
                 endpoint = frame["endpoint"]
+                user = frame["user"]
 
-                response = {"tag": tag, "data": self.handle(endpoint, data)}
+                response = {"tag": tag, "data": self.handle(endpoint, data, user)}
 
                 self.send(response)
             else:
                 ms = frame["ms"]
+                tag = frame["tag"]
 
-                self.handle_ms(ms, data)
+                self.handle_ms(ms, data, tag)
 
     def stop(self):
         self.sock.close()
@@ -62,6 +64,12 @@ class MicroService:
     def send(self, data):
         self.sock.send(str(json.dumps(data)).encode("utf-8"))
 
-    def send_ms(self, ms, data):
-        ms_data = {"ms": ms, "data": data}
+    def send_ms(self, ms, data, tag):
+        ms_data = {"ms": ms, "data": data, "tag": tag}
         self.send(ms_data)
+
+    def send_ms(self, ms, data):
+        tag = str(uuid4())
+        self.send_ms(ms, data, tag)
+
+        return tag

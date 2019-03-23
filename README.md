@@ -12,25 +12,7 @@ $ pip3 install microservicecryp
 
 ## Quick-Start
 
-Here are 15 lines of code for your first echo microservice:
-
-```python
-from cryptic import MicroService
-
-
-def handle(endpoint, data):
-    print(endpoint, data)
-    return data
-
-
-def handle_ms(ms, data):
-    print(ms, data)
-
-
-if __name__ == '__main__':
-    m = MicroService('echo', handle, handle_ms, True)
-    m.run()
-```
+Lock into the [example.py](https://github.com/cryptic-game/python3-lib/blob/master/example.py). Its an easy echo-microservice.
 
 ## Requirements
 
