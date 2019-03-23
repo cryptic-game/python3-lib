@@ -2,6 +2,14 @@
 
 The microservice-libary for python3 of cryptic-game.
 
+Pypi Seite: https://pypi.org/project/microservicecryp/
+
+## Installation:
+
+```bash
+$ pip3 install microservicecryp
+```
+
 ## Quick-Start
 
 Here are 15 lines of code for your first echo microservice:

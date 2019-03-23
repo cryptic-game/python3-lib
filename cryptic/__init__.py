@@ -62,6 +62,6 @@ class MicroService:
     def send(self, data):
         self.sock.send(str(json.dumps(data)).encode("utf-8"))
 
-    def send_ms(ms, data):
+    def send_ms(self, ms, data):
         ms_data = {"ms": ms, "data": data}
         self.send(ms_data)
