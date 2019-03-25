@@ -66,7 +66,9 @@ class MicroService:
                     self.tags_data.update({tag:data})
 
                 else:
-                    self.handle_ms(ms, data, tag)
+                    data : dict = self.handle_ms(data)
+
+                    self.send_ms(ms, data, tag)
 
     def stop(self):
         self.sock.close()

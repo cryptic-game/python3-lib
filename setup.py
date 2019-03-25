@@ -3,7 +3,7 @@ from setuptools import setup, find_packages
 file = open("./README.md").read()
 
 setup(name='microservicecryp',
-      version='1.1',
+      version='1.2',
       description='Microservice handler for cryptic-game',
       author='USE-TO',
       author_email='',
