@@ -6,9 +6,9 @@ def handle(endpoint, data, user):
     return data
 
 
-def handle_ms(ms, data, tag):
-    print(ms, data, tag)
-
+def handle_ms(data):
+    print(data)
+    return data
 
 if __name__ == '__main__':
     m = MicroService('echo', handle, handle_ms)

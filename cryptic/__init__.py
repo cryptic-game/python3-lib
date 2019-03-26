@@ -2,7 +2,9 @@ import socket
 import json
 from os import environ
 from uuid import uuid4
+import time
 
+timeout = 30
 
 class MicroService:
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -21,6 +23,9 @@ class MicroService:
             port = environ['MSSOCKET_PORT']
 
         self.server_address = (host, port)
+
+        self.awaiting = []
+        self.tags_data = {}
 
     def run(self):
         self.connect()
@@ -41,13 +46,14 @@ class MicroService:
 
             if not frame:
                 break
-
+            print(frame)
             data = frame["data"]
 
             if "tag" in frame:
-                tag = frame["tag"]
+
                 endpoint = frame["endpoint"]
                 user = frame["user"]
+                tag = frame["tag"]
 
                 response = {"tag": tag, "data": self.handle(endpoint, data, user)}
 
@@ -56,24 +62,64 @@ class MicroService:
                 ms = frame["ms"]
                 tag = frame["tag"]
 
-                self.handle_ms(ms, data, tag)
+                if tag in self.awaiting:
+                    self.tags_data.update({tag:data})
+
+                else:
+                    data : dict = self.handle_ms(data)
+
+                    self.send_ms(ms, data, tag)
 
     def stop(self):
         self.sock.close()
 
     def send(self, data):
-        self.sock.send(str(json.dumps(data)).encode("utf-8"))
+        x = str(json.dumps(data))
 
-    def send_ms(self, ms, data, tag):
+        self.sock.send(x.encode("utf-8"))
+
+    def send_ms(self, ms, data, tag  = str(uuid4())):
+
         ms_data = {"ms": ms, "data": data, "tag": tag}
         self.send(ms_data)
 
-    def send_ms(self, ms, data):
+        return tag
+
+    def wait_for_response(self, ms, data):
+
+        tag = self.asyncro_call(ms, data)
+
+        return self.wait(tag)
+
+    def asyncro_call(self, ms, data):
+
         tag = str(uuid4())
+
         self.send_ms(ms, data, tag)
+
+        self.awaiting.append(tag)
 
         return tag
 
     def send_to_user(self, user, data):
+        
         user_data = {"action": "address", "user": user, "data": data}
+        
         self.send(user_data)
+
+    def wait(self, tag):
+
+        time_start_waiting = time.time()
+
+        while tag not in self.tags_data.keys():
+            time.sleep(0.01)
+
+            if time.time() - time_start_waiting > timeout:
+                raise TimeoutError()
+
+        data = self.tags_data[tag]
+
+        del (self.tags_data[tag])
+        del (self.awaiting[tag])
+
+        return data
