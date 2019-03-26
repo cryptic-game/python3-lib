@@ -73,3 +73,7 @@ class MicroService:
         self.send_ms(ms, data, tag)
 
         return tag
+
+    def send_to_user(self, user, data):
+        user_data = {"action": "address", "user": user, "data": data}
+        self.send(user_data)
