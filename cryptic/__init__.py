@@ -1,125 +1,157 @@
-import socket
 import json
-from os import environ
-from uuid import uuid4
+import socket
+import threading
 import time
+from os import environ
+from typing import Tuple, Dict, Callable, List, Union, NoReturn
+from uuid import uuid4
 
-timeout = 30
+
+class IllegalArgumentError(ValueError):
+    pass
+
 
 class MicroService:
-    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    SERVICE_REQUEST_MAX_TIMEOUT = 10
 
-    def __init__(self, name, handle, handle_ms):
-        self.name = name
-        self.handle = handle
-        self.handle_ms = handle_ms
+    def __init__(self, name: str, server_address: Tuple[str, int] = None):
+        self._user_endpoints: Dict[Tuple, Callable] = {}
+        self._ms_endpoints: Dict[Tuple, Callable] = {}
+        self._name: str = name
+        self._awaiting = []
+        self._data = {}
 
-        host = '127.0.0.1'
-        port = 1239
+        if server_address is not None:
+            assert len(server_address) == 2, "the server host tuple has to be like (str, int)"
+            assert 0 <= server_address[1] <= 65535, "port has to be in the range of 0 - 65535"
 
-        if 'MSSOCKET_HOST' in environ:
-            host = environ['MSSOCKET_HOST']
-        if 'MSSOCKET_PORT' in environ:
-            port = environ['MSSOCKET_PORT']
+            self._server_address: Tuple[str, int] = server_address
+        else:
+            # use defaults
+            self._server_address: List = ['127.0.0.1', 1239]
 
-        self.server_address = (host, port)
+            # overwrite if environment variable given
+            if 'SERVER_HOST' in environ:
+                self._server_address[0] = environ['SERVER_HOST']
+            if 'SERVER_HOST' in environ:
+                self._server_address[1] = environ['SERVER_HOST']
 
-        self.awaiting = []
-        self.tags_data = {}
+            # convert to tuple
+            self._server_address: Tuple[str, int] = tuple(self._server_address)
 
-    def run(self):
-        self.connect()
-        self.register()
-        self.start()
+        self.__sock: socket.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
-    def connect(self):
-        self.sock.connect(self.server_address)
+    def __send(self, data: dict) -> NoReturn:
+        print("SEND", data, threading.get_ident())
+        self.__sock.send(str(json.dumps(data)).encode("utf-8"))
 
-    def register(self):
-        reg = {"action": "register", "name": self.name}
+    def __connect(self) -> NoReturn:
+        self.__sock.connect(self._server_address)
 
-        self.send(reg)
+    def __register(self) -> NoReturn:
+        self.__send({"action": "register", "name": self._name})
 
-    def start(self):
-        while True:
-            frame = json.loads(self.sock.recv(4096))
+    def __exec(self, frame):
+        # if frame[...] => self._data[key] = value
+        if "tag" in frame and "data" in frame:
+            data: dict = frame["data"]
+            tag: str = frame["tag"]
+            endpoint: Tuple[str, ...] = tuple(frame["endpoint"])
 
-            if not frame:
-                break
-            print(frame)
-            data = frame["data"]
-
-            if "tag" in frame:
-
-                endpoint = frame["endpoint"]
-                user = frame["user"]
-                tag = frame["tag"]
-
-                response = {"tag": tag, "data": self.handle(endpoint, data, user)}
-
-                self.send(response)
+            if tag in self._awaiting:
+                self._data[tag] = data
             else:
-                ms = frame["ms"]
-                tag = frame["tag"]
+                if "ms" in frame:
+                    if endpoint not in self._ms_endpoints:
+                        # MAYBE add sentry here
+                        self.__send({
+                            "error": "unknown service"
+                        })
+                        return
 
-                if tag in self.awaiting:
-                    self.tags_data.update({tag:data})
+                    requesting_microservice = frame["ms"]
+                    self.__send({
+                        "ms": requesting_microservice,
+                        "tag": tag,
+                        "data": self._ms_endpoints[endpoint](data, requesting_microservice)
+                    })
+                elif "user" in frame:
+                    if endpoint not in self._user_endpoints:
+                        # MAYBE add sentry here
+                        self.__send({
+                            "error": "unknown service"
+                        })
+                        return
 
-                else:
-                    data : dict = self.handle_ms(data)
+                    self.__send({
+                        "tag": tag,
+                        "data": self._user_endpoints[endpoint](data, frame["user"])
+                    })
 
-                    self.send_ms(ms, data, tag)
+    def __start(self) -> NoReturn:
+        while True:
+            try:
+                # assume all data coming from the server is well formatted
+                frame: dict = json.loads(self.__sock.recv(4096))
+                print("RECEIVE", frame)
+                threading.Thread(target=self.__exec, args=(frame,)).start()
+            except json.JSONDecodeError:
+                # TODO theoretically sentry here
+                continue
 
-    def stop(self):
-        self.sock.close()
+    def run(self) -> NoReturn:
+        self.__connect()
+        self.__register()
+        self.__start()
 
-    def send(self, data):
-        x = str(json.dumps(data))
+    def __endpoint(self, path: Union[List[str], Tuple[str, ...]], for_user_request: bool = False) -> Callable:
+        def decorator(func: Callable) -> Callable:
+            if isinstance(path, list):
+                endpoint_path: Tuple[str, ...] = tuple(path)
+            elif isinstance(path, tuple):
+                endpoint_path: Tuple[str, ...] = path
+            else:
+                raise IllegalArgumentError("endpoint(...) expects a list or tuple as endpoint.")
 
-        self.sock.send(x.encode("utf-8"))
+            if for_user_request:
+                self._user_endpoints[endpoint_path] = func
+            else:
+                self._ms_endpoints[endpoint_path] = func
 
-    def send_ms(self, ms, data, tag  = str(uuid4())):
+            def inner(*args, **kwargs) -> NoReturn:
+                print("This function is not directly callable.")
 
-        ms_data = {"ms": ms, "data": data, "tag": tag}
-        self.send(ms_data)
+            return inner
 
-        return tag
+        return decorator
 
-    def wait_for_response(self, ms, data):
+    def microservice_endpoint(self, path: Union[List[str], Tuple[str, ...]]) -> Callable:
+        return self.__endpoint(path, False)
 
-        tag = self.asyncro_call(ms, data)
+    def user_endpoint(self, path: Union[List[str], Tuple[str, ...]]) -> Callable:
+        return self.__endpoint(path, True)
 
-        return self.wait(tag)
+    def contact_microservice(self, name: str, endpoint: List[str], data: dict, uuid: Union[None, str] = None):
+        print("contact", threading.get_ident())
+        # No new thread, because this should be called only from inside an endpoint
+        if uuid is None:
+            uuid = str(uuid4())
 
-    def asyncro_call(self, ms, data):
+        self.__send({"ms": name, "data": data, "tag": uuid, "endpoint": endpoint})
 
-        tag = str(uuid4())
-
-        self.send_ms(ms, data, tag)
-
-        self.awaiting.append(tag)
-
-        return tag
-
-    def send_to_user(self, user, data):
-        
-        user_data = {"action": "address", "user": user, "data": data}
-        
-        self.send(user_data)
-
-    def wait(self, tag):
+        self._awaiting.append(uuid)
 
         time_start_waiting = time.time()
 
-        while tag not in self.tags_data.keys():
-            time.sleep(0.01)
+        while uuid not in self._data.keys():
+            time.sleep(0.001)
 
-            if time.time() - time_start_waiting > timeout:
+            if time.time() - time_start_waiting > MicroService.SERVICE_REQUEST_MAX_TIMEOUT:
                 raise TimeoutError()
 
-        data = self.tags_data[tag]
+        data = self._data[uuid]
 
-        del (self.tags_data[tag])
-        del (self.awaiting[tag])
+        self._awaiting.remove(uuid)
+        del self._data[uuid]
 
         return data
