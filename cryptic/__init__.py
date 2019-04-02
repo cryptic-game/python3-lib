@@ -42,7 +42,6 @@ class MicroService:
         self.__sock: socket.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
     def __send(self, data: dict) -> NoReturn:
-        print("SEND", data, threading.get_ident())
         self.__sock.send(str(json.dumps(data)).encode("utf-8"))
 
     def __connect(self) -> NoReturn:
@@ -100,7 +99,7 @@ class MicroService:
             try:
                 # assume all data coming from the server is well formatted
                 frame: dict = json.loads(self.__sock.recv(4096))
-                print("RECEIVE", frame)
+
                 threading.Thread(target=self.__exec, args=(frame,)).start()
             except json.JSONDecodeError:
                 # TODO theoretically sentry here
@@ -139,7 +138,6 @@ class MicroService:
         return self.__endpoint(path, True)
 
     def contact_microservice(self, name: str, endpoint: List[str], data: dict, uuid: Union[None, str] = None):
-        print("contact", threading.get_ident())
         # No new thread, because this should be called only from inside an endpoint
         if uuid is None:
             uuid = str(uuid4())
