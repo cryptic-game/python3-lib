@@ -2,17 +2,37 @@
 
 The microservice-libary for python3 of cryptic-game.
 
-Pypi Seite: https://pypi.org/project/microservicecryp/
+Pypi Seite: https://pypi.org/project/cryptic-game/
 
 ## Installation:
 
 ```bash
-$ pip3 install microservicecryp
+$ pip3 install cryptic-game
 ```
 
-## Quick-Start
+## Quick Start
 
-Lock into the [example.py](https://github.com/cryptic-game/python3-lib/blob/master/example.py). Its an easy echo-microservice.
+```python
+from cryptic import MicroService
+
+ms: MicroService = MicroService(name="echo")
+
+
+@ms.microservice_endpoint(path=["microservice"])
+def handle(data: dict, microservice: str):
+    print(data, microservice)
+    return {}
+
+
+@ms.user_endpoint(path=["user"])
+def handle(data: dict, user: str):
+    print(data, user)
+    return {}
+
+
+if __name__ == '__main__':
+    ms.run()
+```
 
 ## Requirements
 

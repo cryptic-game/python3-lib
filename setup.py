@@ -3,8 +3,8 @@ from setuptools import setup, find_packages
 with open("./README.md", "r") as f:
     file = f.read()
 
-setup(name='microservicecryp',
-      version='1.2.3',
+setup(name='cryptic-game',
+      version='0.0.1',
       description='Microservice handler for cryptic-game',
       author='cryptic-game',
       author_email='faq@cryptic-game.net',
