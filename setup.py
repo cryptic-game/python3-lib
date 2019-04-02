@@ -1,13 +1,15 @@
 from setuptools import setup, find_packages
 
-file = open("./README.md").read()
+with open("./README.md", "r") as f:
+    file = f.read()
 
 setup(name='microservicecryp',
-      version='1.2',
+      version='1.2.3',
       description='Microservice handler for cryptic-game',
-      author='USE-TO',
-      author_email='',
-      long_description = file,
+      author='cryptic-game',
+      author_email='faq@cryptic-game.net',
+      long_description=file,
+      long_description_content_type='text/markdown',
       url='https://github.com/cryptic-game/python3-lib',
       packages=find_packages(),
-     )
+      )
