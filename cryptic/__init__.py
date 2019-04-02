@@ -86,7 +86,7 @@ class MicroService:
 
                     d = self._user_endpoints[endpoint](data, frame["user"])
 
-                    # only a workarround
+                    # only a workaround
                     if not d:
                         d = {}
 

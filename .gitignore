@@ -207,4 +207,5 @@ dmypy.json
 #custom
 
 ./idea
-idea
+.idea
+.idea/vcs.xml
