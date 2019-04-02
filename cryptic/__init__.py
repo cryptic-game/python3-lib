@@ -72,6 +72,7 @@ class MicroService:
                     requesting_microservice = frame["ms"]
                     self.__send({
                         "ms": requesting_microservice,
+                        "endpoint": [],
                         "tag": tag,
                         "data": self._ms_endpoints[endpoint](data, requesting_microservice)
                     })
@@ -83,9 +84,15 @@ class MicroService:
                         })
                         return
 
+                    d = self._user_endpoints[endpoint](data, frame["user"])
+
+                    # only a workarround
+                    if not d:
+                        d = {}
+
                     self.__send({
                         "tag": tag,
-                        "data": self._user_endpoints[endpoint](data, frame["user"])
+                        "data": d
                     })
 
     def __start(self) -> NoReturn:
