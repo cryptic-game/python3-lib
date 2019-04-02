@@ -11,6 +11,10 @@ class IllegalArgumentError(ValueError):
     pass
 
 
+class IllegalReturnTypeError(ValueError):
+    pass
+
+
 class MicroService:
     SERVICE_REQUEST_MAX_TIMEOUT = 10
 
@@ -51,7 +55,6 @@ class MicroService:
         self.__send({"action": "register", "name": self._name})
 
     def __exec(self, frame):
-        # if frame[...] => self._data[key] = value
         if "tag" in frame and "data" in frame:
             data: dict = frame["data"]
             tag: str = frame["tag"]
@@ -69,11 +72,22 @@ class MicroService:
                         return
 
                     requesting_microservice = frame["ms"]
+
+                    return_data = self._ms_endpoints[endpoint](data, requesting_microservice)
+
+                    # if the handler function does not return anything
+                    if return_data is None:
+                        return_data = {}
+                    else:
+                        if isinstance(return_data, dict):
+                            raise IllegalReturnTypeError(
+                                "all handler functions are expected to return either noting or a dict.")
+
                     self.__send({
                         "ms": requesting_microservice,
                         "endpoint": [],
                         "tag": tag,
-                        "data": self._ms_endpoints[endpoint](data, requesting_microservice)
+                        "data": return_data
                     })
                 elif "user" in frame:
                     if endpoint not in self._user_endpoints:
@@ -83,15 +97,19 @@ class MicroService:
                         })
                         return
 
-                    d = self._user_endpoints[endpoint](data, frame["user"])
+                    return_data = self._user_endpoints[endpoint](data, frame["user"])
 
-                    # only a workaround
-                    if not d:
-                        d = {}
+                    # if the handler function does not return anything
+                    if not return_data:
+                        return_data = {}
+                    else:
+                        if isinstance(return_data, dict):
+                            raise IllegalReturnTypeError(
+                                "all handler functions are expected to return either noting or a dict.")
 
                     self.__send({
                         "tag": tag,
-                        "data": d
+                        "data": return_data
                     })
 
     def __start(self) -> NoReturn:
