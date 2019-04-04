@@ -37,8 +37,8 @@ class MicroService:
             # overwrite if environment variable given
             if 'SERVER_HOST' in environ:
                 self._server_address[0] = environ['SERVER_HOST']
-            if 'SERVER_HOST' in environ:
-                self._server_address[1] = environ['SERVER_HOST']
+            if 'SERVER_PORT' in environ:
+                self._server_address[1] = int(environ['SERVER_PORT'])
 
             # convert to tuple
             self._server_address: Tuple[str, int] = tuple(self._server_address)

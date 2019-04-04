@@ -46,8 +46,8 @@ Your microservice will be supported by the [game-server of cryptic](https://gith
 
 | key               | default value |
 |-------------------|---------------|
-| MSSOCKET_HOST     | 127.0.0.1     |
-| MSSOCKET_PORT     | 1239          |
+| SERVER_HOST       | 127.0.0.1     |
+| SERVER_PORT       | 1239          |
 
 ## Wiki
 
