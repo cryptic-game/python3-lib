@@ -4,7 +4,7 @@ with open("./README.md", "r") as f:
     file = f.read()
 
 setup(name='cryptic-game',
-      version='0.0.1',
+      version='0.0.2',
       description='Microservice handler for cryptic-game',
       author='cryptic-game',
       author_email='faq@cryptic-game.net',
