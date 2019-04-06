@@ -67,7 +67,11 @@ class MicroService:
                     if endpoint not in self._ms_endpoints:
                         # MAYBE add sentry here
                         self.__send({
-                            "error": "unknown service"
+                            "tag": tag,
+                            "user": frame["user"],
+                            "data": {
+                                "error": "unknown service"
+                            }
                         })
                         return
 
@@ -93,14 +97,18 @@ class MicroService:
                     if endpoint not in self._user_endpoints:
                         # MAYBE add sentry here
                         self.__send({
-                            "error": "unknown service"
+                            "tag": tag,
+                            "user": frame["user"],
+                            "data": {
+                                "error": "unknown service"
+                            }
                         })
                         return
 
                     return_data = self._user_endpoints[endpoint](data, frame["user"])
 
                     # if the handler function does not return anything
-                    if not return_data:
+                    if return_data is None:
                         return_data = {}
                     else:
                         if isinstance(return_data, dict):
@@ -178,3 +186,10 @@ class MicroService:
         del self._data[uuid]
 
         return data
+
+    def contact_user(self, user_id: str, data: dict):
+        self.__send({
+            "action": "address",
+            "user": user_id,
+            "data": data
+        })
