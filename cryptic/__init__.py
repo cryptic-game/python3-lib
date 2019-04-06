@@ -83,7 +83,7 @@ class MicroService:
                     if return_data is None:
                         return_data = {}
                     else:
-                        if isinstance(return_data, dict):
+                        if not isinstance(return_data, dict):
                             raise IllegalReturnTypeError(
                                 "all handler functions are expected to return either noting or a dict.")
 
@@ -111,7 +111,7 @@ class MicroService:
                     if return_data is None:
                         return_data = {}
                     else:
-                        if isinstance(return_data, dict):
+                        if not isinstance(return_data, dict):
                             raise IllegalReturnTypeError(
                                 "all handler functions are expected to return either noting or a dict.")
 
