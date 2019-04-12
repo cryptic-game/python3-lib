@@ -1,10 +1,17 @@
 import json
+import os
 import socket
 import threading
 import time
 from os import environ
-from typing import Tuple, Dict, Callable, List, Union, NoReturn
+from typing import Tuple, Dict, Callable, List, Union, NoReturn, Any
 from uuid import uuid4
+
+from sqlalchemy import create_engine
+from sqlalchemy.engine.base import Engine
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.ext.declarative.api import DeclarativeMeta
+from sqlalchemy.orm import sessionmaker
 
 
 class IllegalArgumentError(ValueError):
@@ -193,3 +200,23 @@ class MicroService:
             "user": user_id,
             "data": data
         })
+
+
+def setup_database(filename: str, storage_location: str = "data/") -> Tuple[Engine, DeclarativeMeta, Any]:
+    """
+    :param filename: The filename
+    :param storage_location: The directory the database file will be stored
+    :return: Tuple[DeclarativeMeta, Any] where "Any" really is of the type sessionmaker(bind=engine)() returns
+    """
+    if not os.path.exists(storage_location):
+        os.makedirs(storage_location)
+
+    engine: Engine = create_engine('sqlite:///' + os.path.join(storage_location, filename))
+    # Because it returns a class
+    # noinspection PyPep8Naming
+    Session: sessionmaker = sessionmaker(bind=engine)
+    # The same here
+    # noinspection PyPep8Naming
+    Base: DeclarativeMeta = declarative_base()
+    session: Session = Session()
+    return engine, Base, session
