@@ -13,13 +13,16 @@ $ pip3 install cryptic-game
 ## Quick Start
 
 ```python
-from cryptic import MicroService, setup_database, get_config, Config
+from cryptic import MicroService, _config
+from uuid import uuid4
+from sqlalchemy import Column, Integer, String, Boolean
+from typing import Union
 
-# important: set the mode before initializing anything else
-config: Config = get_config(mode="debug")
-# config.set_mode("debug")  # this is the other possibility to set the mode
+_config.set_mode("debug")
+
 ms: MicroService = MicroService(name="echo")
-engine, Base, session = setup_database()
+
+database_wrapper = ms.get_wrapper()
 
 
 @ms.microservice_endpoint(path=["microservice"])
@@ -34,8 +37,22 @@ def handle(data: dict, user: str):
     return {}
 
 
+class MyDataBase(database_wrapper.Base):
+    __tablename__: str = 'test'
+
+    uuid: Union[Column, str] = Column(String(36), primary_key=True, unique=True)
+    name: Union[Column, str] = Column(String(255), nullable=False)
+
+    @staticmethod
+    def create(name: str) -> 'MyDataBase':
+        mydb : MyDataBase = MyDataBase(uuid = str(uuid4()), name=name)
+
+        return mydb
+
+
 if __name__ == '__main__':
     ms.run()
+
 ```
 
 ## Requirements

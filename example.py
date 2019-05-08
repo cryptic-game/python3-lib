@@ -30,7 +30,7 @@ class MyDataBase(database_wrapper.Base):
 
     @staticmethod
     def create(name: str) -> 'MyDataBase':
-        mydb : MyDataBase = MyDataBase(uuid = str(uuid4()), name=name)
+        mydb: MyDataBase = MyDataBase(uuid=str(uuid4()), name=name)
 
         return mydb
 

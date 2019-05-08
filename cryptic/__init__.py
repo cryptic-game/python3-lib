@@ -84,13 +84,12 @@ class DatabaseWrapper:
     def __init__(self):
 
         if _config["MODE"] == "debug":
-            _config["DBMS"] == "sqlite"
+            _config["DBMS"] = "sqlite"
         elif _config["MODE"] == "prod":
-            _config["MODE"] == "mysql"
+            _config["DBMS"] = "mysql"
 
-        print(_config["MODE"],_config["DBMS"])
+        print(_config["MODE"], _config["DBMS"])
         self.setup_database()
-
 
     @staticmethod
     def __setup_sqlite(filename: str, storage_location: str = "data/") -> Engine:
@@ -140,7 +139,7 @@ class DatabaseWrapper:
         # The same here
         # noinspection PyPep8Naming
         self.Base: DeclarativeMeta = declarative_base()
-        self.session: Session = self.Session()
+        self.session = self.Session()
 
     @staticmethod
     def get_config(mode: Optional[str] = None) -> Config:
