@@ -88,7 +88,6 @@ class DatabaseWrapper:
         elif _config["MODE"] == "prod":
             _config["DBMS"] = "mysql"
 
-        print(_config["MODE"], _config["DBMS"])
         self.setup_database()
 
     @staticmethod
@@ -141,17 +140,17 @@ class DatabaseWrapper:
         self.Base: DeclarativeMeta = declarative_base()
         self.session = self.Session()
 
-    @staticmethod
-    def get_config(mode: Optional[str] = None) -> Config:
-        if mode is not None:
-            _config.set_mode(mode)
-        return _config
+    def reload(self):
+
+        self.Session = sessionmaker(bind=self.engine)
+
+        self.session = self.Session()
 
 
 class MicroService:
     SERVICE_REQUEST_MAX_TIMEOUT = 10
 
-    def __init__(self, name: str, server_address: Tuple[str, int] = None, mode="release"):
+    def __init__(self, name: str, server_address: Tuple[str, int] = None):
         self._user_endpoints: Dict[Tuple, Callable] = {}
         self._ms_endpoints: Dict[Tuple, Callable] = {}
         self._name: str = name
@@ -242,7 +241,7 @@ class MicroService:
                     try:
                         return_data = self._user_endpoints[endpoint](data, frame["user"])
                     except InvalidRequestError:
-                        self._database.setup_database()
+                        self._database.reload()
                         # Just try to save the request
                         return_data = self._user_endpoints[endpoint](data, frame["user"])
 
@@ -338,3 +337,9 @@ class MicroService:
 
     def get_wrapper(self) -> 'DatabaseWrapper':
         return self._database
+
+
+def get_config(mode: Optional[str] = None) -> Config:
+    if mode is not None:
+        _config.set_mode(mode)
+    return _config

@@ -1,9 +1,9 @@
-from cryptic import MicroService, _config
+from cryptic import MicroService, get_config, Config
 from uuid import uuid4
 from sqlalchemy import Column, Integer, String, Boolean
 from typing import Union
 
-_config.set_mode("debug")
+config: Config = get_config("debug")  # this sets config to debug mode
 
 ms: MicroService = MicroService(name="echo")
 

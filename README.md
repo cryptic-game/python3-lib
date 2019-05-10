@@ -13,12 +13,12 @@ $ pip3 install cryptic-game
 ## Quick Start
 
 ```python
-from cryptic import MicroService, _config
+from cryptic import MicroService, get_config, Config
 from uuid import uuid4
 from sqlalchemy import Column, Integer, String, Boolean
 from typing import Union
 
-_config.set_mode("debug")
+config: Config = get_config("debug")  # this sets config to debug mode
 
 ms: MicroService = MicroService(name="echo")
 
@@ -45,7 +45,7 @@ class MyDataBase(database_wrapper.Base):
 
     @staticmethod
     def create(name: str) -> 'MyDataBase':
-        mydb : MyDataBase = MyDataBase(uuid = str(uuid4()), name=name)
+        mydb: MyDataBase = MyDataBase(uuid=str(uuid4()), name=name)
 
         return mydb
 
