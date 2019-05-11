@@ -12,7 +12,8 @@ from sqlalchemy.engine.base import Engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.ext.declarative.api import DeclarativeMeta
 from sqlalchemy.orm import sessionmaker
-from sqlalchemy.exc import InvalidRequestError
+from sqlalchemy import select
+from sqlalchemy import exc
 
 
 class IllegalArgumentError(ValueError):
@@ -91,6 +92,7 @@ class DatabaseWrapper:
         self.session = None
         self.Session = None
         self.Base = None
+        self.connection = None
 
         self.setup_database()
 
@@ -104,7 +106,8 @@ class DatabaseWrapper:
         if not os.path.exists(storage_location):
             os.makedirs(storage_location)
 
-        return create_engine('sqlite:///' + os.path.join(storage_location, filename))
+        return create_engine('sqlite:///' + os.path.join(storage_location, filename),
+                             pool_recycle=_config['RECYCLE_POOL'])
 
     @staticmethod
     def __setup_mysql(username: str, password: str, hostname: str, port: int, database: str) -> Engine:
@@ -143,10 +146,26 @@ class DatabaseWrapper:
         # noinspection PyPep8Naming
         self.Base: DeclarativeMeta = declarative_base()
         self.session = self.Session()
+        self.connection = self.session.connection()
 
-    def reload(self):
+    def reload(self) -> None:
         self.Session = sessionmaker(bind=self.engine)
         self.session = self.Session()
+        self.connection = self.session.connection()
+
+    def ping(self) -> None:
+
+        try:
+
+            self.connection.scalar(select([1]))
+
+            return
+
+        except exc.DBAPIError:
+
+            print("Connection Timeout")
+
+        self.reload()
 
 
 class MicroService:
@@ -212,6 +231,7 @@ class MicroService:
 
                     requesting_microservice = frame["ms"]
 
+                    self._database.ping()
                     return_data = self._ms_endpoints[endpoint](data, requesting_microservice)
 
                     # if the handler function does not return anything
@@ -240,12 +260,8 @@ class MicroService:
                         })
                         return
 
-                    try:
-                        return_data = self._user_endpoints[endpoint](data, frame["user"])
-                    except InvalidRequestError:
-                        self._database.reload()
-                        # Just try to save the request
-                        return_data = self._user_endpoints[endpoint](data, frame["user"])
+                    self._database.ping()
+                    return_data = self._user_endpoints[endpoint](data, frame["user"])
 
                     # if the handler function does not return anything
                     if return_data is None:
