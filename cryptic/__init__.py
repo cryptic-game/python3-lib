@@ -82,11 +82,15 @@ _config = Config()
 class DatabaseWrapper:
 
     def __init__(self):
-
         if _config["MODE"] == "debug":
             _config["DBMS"] = "sqlite"
         elif _config["MODE"] == "prod":
             _config["DBMS"] = "mysql"
+
+        self.engine = None
+        self.session = None
+        self.Session = None
+        self.Base = None
 
         self.setup_database()
 
@@ -141,9 +145,7 @@ class DatabaseWrapper:
         self.session = self.Session()
 
     def reload(self):
-
         self.Session = sessionmaker(bind=self.engine)
-
         self.session = self.Session()
 
 
