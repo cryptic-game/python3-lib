@@ -34,7 +34,7 @@ class UnknownModeError(ValueError):
 
 class Config:
     to_load: List[Tuple[str, str]] = [
-        ('MODE', 'debug'),
+        ('MODE', 'production'),
         ('DATA_LOCATION', 'data/'),
         ('DBMS', 'sqlite'),
         ('SQLITE_FILE', 'data.db'),
@@ -85,7 +85,7 @@ class DatabaseWrapper:
     def __init__(self):
         if _config["MODE"] == "debug":
             _config["DBMS"] = "sqlite"
-        elif _config["MODE"] == "prod":
+        elif _config["MODE"] == "production":
             _config["DBMS"] = "mysql"
 
         self.engine = None
@@ -357,6 +357,6 @@ class MicroService:
 
 
 def get_config(mode: Optional[str] = None) -> Config:
-    if mode is not None:
+    if mode:
         _config.set_mode(mode)
     return _config
