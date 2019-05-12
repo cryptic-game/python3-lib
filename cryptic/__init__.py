@@ -161,12 +161,11 @@ class DatabaseWrapper:
 
             return
 
-        except exc.DBAPIError:
+        except:
 
             print("Connection Timeout")
 
-        self.reload()
-
+            self.reload()
 
 class MicroService:
     SERVICE_REQUEST_MAX_TIMEOUT = 10
