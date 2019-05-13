@@ -167,6 +167,7 @@ class DatabaseWrapper:
 
             self.reload()
 
+
 class MicroService:
     SERVICE_REQUEST_MAX_TIMEOUT = 10
 
@@ -284,6 +285,19 @@ class MicroService:
                 threading.Thread(target=self.__exec, args=(frame,)).start()
             except json.JSONDecodeError:
                 # TODO theoretically sentry here
+                continue
+            except socket.error:
+                print("Connection closed by Server ... trying to reconnect")
+
+                while True:
+                    # Tries to reastablish connection to main java server
+                    try:
+                        self.__connect()
+                        self.__register()
+                        break
+
+                    except:
+                        time.sleep(0.5)
                 continue
 
     def run(self) -> NoReturn:
