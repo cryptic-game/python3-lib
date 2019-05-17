@@ -12,6 +12,8 @@ from sqlalchemy.engine.base import Engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.ext.declarative.api import DeclarativeMeta
 from sqlalchemy.orm import sessionmaker
+from sqlalchemy import select
+from sqlalchemy import exc
 
 
 class IllegalArgumentError(ValueError):
@@ -30,6 +32,141 @@ class UnknownModeError(ValueError):
     pass
 
 
+class Config:
+    to_load: List[Tuple[str, str]] = [
+        ('MODE', 'production'),
+        ('DATA_LOCATION', 'data/'),
+        ('DBMS', 'sqlite'),
+        ('SQLITE_FILE', 'data.db'),
+        ('MYSQL_HOSTNAME', ''),  # as MYSQL_... is not the default, we don't need default values
+        ('MYSQL_PORT', ''),
+        ('MYSQL_DATABASE', ''),
+        ('MYSQL_USERNAME', ''),
+        ('MYSQL_PASSWORD', ''),
+        ('RECYCLE_POOL', 1550)
+    ]
+
+    def __init__(self):
+        self.__config: dict = {}
+
+        # load all configuration values from the env
+        for key in Config.to_load:
+            if isinstance(key, tuple):
+                if key[0] in os.environ:
+                    self.__config[key[0]] = os.environ.get(key[0])
+                else:
+                    self.__config[key[0]] = key[1]
+            elif key in os.environ:
+                self.__config[key] = os.environ.get(key)
+
+    def __contains__(self, item: str):
+        return item in self.__config
+
+    def __getitem__(self, item: str) -> Optional[str]:
+        if item in self:
+            return self.__config[item]
+        return None
+
+    def __setitem__(self, key: str, value: Any):
+        self.__config[key] = value
+
+    def set_mode(self, mode):
+        if mode.lower() in ("debug", "production"):
+            self["mode"] = mode
+        else:
+            raise UnknownModeError(f"the mode {mode} is unknown")
+
+
+_config = Config()
+
+
+class DatabaseWrapper:
+
+    def __init__(self):
+        if _config["MODE"] == "debug":
+            _config["DBMS"] = "sqlite"
+        elif _config["MODE"] == "production":
+            _config["DBMS"] = "mysql"
+
+        self.engine = None
+        self.session = None
+        self.Session = None
+        self.Base = None
+        self.connection = None
+
+        self.setup_database()
+
+    @staticmethod
+    def __setup_sqlite(filename: str, storage_location: str = "data/") -> Engine:
+        """
+        :param filename: The filename
+        :param storage_location: The directory the database file will be stored
+        :return: Tuple[DeclarativeMeta, Any] where "Any" really is of the type sessionmaker(bind=engine)() returns
+        """
+        if not os.path.exists(storage_location):
+            os.makedirs(storage_location)
+
+        return create_engine('sqlite:///' + os.path.join(storage_location, filename),
+                             pool_recycle=_config['RECYCLE_POOL'])
+
+    @staticmethod
+    def __setup_mysql(username: str, password: str, hostname: str, port: int, database: str) -> Engine:
+        assert 0 < port <= 65535, "invalid port number"
+        return create_engine(f"mysql+pymysql://{username}:{password}@{hostname}:{port}/{database}")
+
+    def setup_database(self) -> None:
+        if _config["DBMS"] == "sqlite":
+            self.engine: Engine = self.__setup_sqlite(
+                filename=_config["SQLITE_FILE"],
+                storage_location=_config["DATA_LOCATION"]
+            )
+        elif _config["DBMS"] == "mysql":
+            port: str = _config["MYSQL_PORT"]
+            if not port.isdecimal():
+                # "merkste selber wo das problem liegt?"
+                # thanks to google translate
+                # 19:05 15.04.2019 Head Meeting
+                raise Exception("you dumb bastard gave the port for mysql as an float value")
+            port: int = int(port)
+
+            self.engine: Engine = self.__setup_mysql(
+                username=_config["MYSQL_USERNAME"],
+                password=_config["MYSQL_PASSWORD"],
+                hostname=_config["MYSQL_HOSTNAME"],
+                port=port,
+                database=_config["MYSQL_DATABASE"]
+            )
+        else:
+            raise UnknownDBMSTypeError(f"the DBMS {_config['DBMS']} is unknown")
+
+        # Because it returns a class
+        # noinspection PyPep8Naming
+        self.Session: sessionmaker = sessionmaker(bind=self.engine)
+        # The same here
+        # noinspection PyPep8Naming
+        self.Base: DeclarativeMeta = declarative_base()
+        self.session = self.Session()
+        self.connection = self.session.connection()
+
+    def reload(self) -> None:
+        self.Session = sessionmaker(bind=self.engine)
+        self.session = self.Session()
+        self.connection = self.session.connection()
+
+    def ping(self) -> None:
+
+        try:
+
+            self.connection.scalar(select([1]))
+
+            return
+
+        except:
+
+            print("Connection Timeout")
+
+            self.reload()
+
 class MicroService:
     SERVICE_REQUEST_MAX_TIMEOUT = 10
 
@@ -39,6 +176,7 @@ class MicroService:
         self._name: str = name
         self._awaiting = []
         self._data = {}
+        self._database = DatabaseWrapper()
 
         if server_address is not None:
             assert len(server_address) == 2, "the server host tuple has to be like (str, int)"
@@ -92,6 +230,7 @@ class MicroService:
 
                     requesting_microservice = frame["ms"]
 
+                    self._database.ping()
                     return_data = self._ms_endpoints[endpoint](data, requesting_microservice)
 
                     # if the handler function does not return anything
@@ -120,6 +259,7 @@ class MicroService:
                         })
                         return
 
+                    self._database.ping()
                     return_data = self._user_endpoints[endpoint](data, frame["user"])
 
                     # if the handler function does not return anything
@@ -209,108 +349,14 @@ class MicroService:
             "data": data
         })
 
+    def get_db_session(self) -> Tuple[Engine, DeclarativeMeta, Any]:
+        return self._database.engine, self._database.Base, self._database.session
 
-class Config:
-    to_load: List[Tuple[str, str]] = [
-        ('MODE', 'debug'),
-        ('DATA_LOCATION', 'data/'),
-        ('DBMS', 'sqlite'),
-        ('SQLITE_FILE', 'data.db'),
-        ('MYSQL_HOSTNAME', ''),  # as MYSQL_... is not the default, we don't need default values
-        ('MYSQL_PORT', ''),
-        ('MYSQL_DATABASE', ''),
-        ('MYSQL_USERNAME', ''),
-        ('MYSQL_PASSWORD', ''),
-    ]
-
-    def __init__(self):
-        self.__config: dict = {}
-
-        # load all configuration values from the env
-        for key in Config.to_load:
-            if isinstance(key, tuple):
-                if key[0] in os.environ:
-                    self.__config[key[0]] = os.environ.get(key[0])
-                else:
-                    self.__config[key[0]] = key[1]
-            elif key in os.environ:
-                self.__config[key] = os.environ.get(key)
-
-    def __contains__(self, item: str):
-        return item in self.__config
-
-    def __getitem__(self, item: str) -> Optional[str]:
-        if item in self:
-            return self.__config[item]
-        return None
-
-    def __setitem__(self, key: str, value: Any):
-        self.__config[key] = value
-
-    def set_mode(self, mode):
-        if mode.lower() in ("debug", "production"):
-            self["mode"] = mode
-        else:
-            raise UnknownModeError(f"the mode {mode} is unknown")
-
-
-_config = Config()
-
-
-def __setup_sqlite(filename: str, storage_location: str = "data/") -> Engine:
-    """
-    :param filename: The filename
-    :param storage_location: The directory the database file will be stored
-    :return: Tuple[DeclarativeMeta, Any] where "Any" really is of the type sessionmaker(bind=engine)() returns
-    """
-    if not os.path.exists(storage_location):
-        os.makedirs(storage_location)
-
-    return create_engine('sqlite:///' + os.path.join(storage_location, filename))
-
-
-def __setup_mysql(username: str, password: str, hostname: str, port: int, database: str) -> Engine:
-    assert 0 < port <= 65535, "invalid port number"
-    return create_engine(f"mysql+pymysql://{username}:{password}@{hostname}:{port}/{database}")
-
-
-def setup_database() -> Tuple[Engine, DeclarativeMeta, Any]:
-    if _config["dbms"] == "sqlite":
-        engine: Engine = __setup_sqlite(
-            filename=_config["SQLITE_FILE"],
-            storage_location=_config["DATA_LOCATION"]
-        )
-    elif _config["dbms"] == "mysql":
-        port: str = _config["MYSQL_PORT"]
-        if not port.isdecimal():
-            # "merkste selber wo das problem liegt?"
-            # thanks to google translate
-            # 19:05 15.04.2019 Head Meeting
-            raise Exception("in qua iacet forsit animadverto se?")
-        port: int = int(port)
-
-        engine: Engine = __setup_mysql(
-            username=_config["MYSQL_USERNAME"],
-            password=_config["MYSQL_PASSWORD"],
-            hostname=_config["MYSQL_HOSTNAME"],
-            port=port,
-            database=_config["MYSQL_DATABASE"]
-        )
-    else:
-        raise UnknownDBMSTypeError(f"the DBMS {_config['dbms']} is unknown")
-
-    # Because it returns a class
-    # noinspection PyPep8Naming
-    Session: sessionmaker = sessionmaker(bind=engine)
-    # The same here
-    # noinspection PyPep8Naming
-    Base: DeclarativeMeta = declarative_base()
-    session: Session = Session()
-
-    return engine, Base, session
+    def get_wrapper(self) -> 'DatabaseWrapper':
+        return self._database
 
 
 def get_config(mode: Optional[str] = None) -> Config:
-    if mode is not None:
+    if mode:
         _config.set_mode(mode)
     return _config
