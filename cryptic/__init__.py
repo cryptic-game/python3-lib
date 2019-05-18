@@ -13,7 +13,6 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.ext.declarative.api import DeclarativeMeta
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy import select
-from sqlalchemy import exc
 
 
 class IllegalArgumentError(ValueError):
@@ -106,13 +105,13 @@ class DatabaseWrapper:
         if not os.path.exists(storage_location):
             os.makedirs(storage_location)
 
-        return create_engine('sqlite:///' + os.path.join(storage_location, filename),
-                             pool_recycle=_config['RECYCLE_POOL'])
+        return create_engine('sqlite:///' + os.path.join(storage_location, filename))
 
     @staticmethod
     def __setup_mysql(username: str, password: str, hostname: str, port: int, database: str) -> Engine:
         assert 0 < port <= 65535, "invalid port number"
-        return create_engine(f"mysql+pymysql://{username}:{password}@{hostname}:{port}/{database}")
+        return create_engine(f"mysql+pymysql://{username}:{password}@{hostname}:{port}/{database}",
+                             pool_recycle=_config['RECYCLE_POOL'])
 
     def setup_database(self) -> None:
         if _config["DBMS"] == "sqlite":
@@ -126,7 +125,7 @@ class DatabaseWrapper:
                 # "merkste selber wo das problem liegt?"
                 # thanks to google translate
                 # 19:05 15.04.2019 Head Meeting
-                raise Exception("you dumb bastard gave the port for mysql as an float value")
+                raise Exception("in qua iacet forsit animadverto se?")
             port: int = int(port)
 
             self.engine: Engine = self.__setup_mysql(
@@ -154,18 +153,13 @@ class DatabaseWrapper:
         self.connection = self.session.connection()
 
     def ping(self) -> None:
-
         try:
-
             self.connection.scalar(select([1]))
-
             return
-
         except:
-
             print("Connection Timeout")
-
             self.reload()
+
 
 class MicroService:
     SERVICE_REQUEST_MAX_TIMEOUT = 10
@@ -199,10 +193,18 @@ class MicroService:
         self.__sock: socket.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
     def __send(self, data: dict) -> NoReturn:
-        self.__sock.send(str(json.dumps(data)).encode("utf-8"))
+        try:
+            self.__sock.send(str(json.dumps(data)).encode("utf-8"))
+        except socket.error:
+            self.__reconnect()
 
     def __connect(self) -> NoReturn:
-        self.__sock.connect(self._server_address)
+        while True:
+            try:
+                self.__sock.connect(self._server_address)
+                return
+            except socket.error:
+                time.sleep(0.5)
 
     def __register(self) -> NoReturn:
         self.__send({"action": "register", "name": self._name})
@@ -279,12 +281,37 @@ class MicroService:
         while True:
             try:
                 # assume all data coming from the server is well formatted
-                frame: dict = json.loads(self.__sock.recv(4096))
+                data: bytes = self.__sock.recv(4096)
+
+                if len(data) == 0:
+                    self.__reconnect()
+                    continue
+
+                frame: dict = json.loads(data)
 
                 threading.Thread(target=self.__exec, args=(frame,)).start()
             except json.JSONDecodeError:
                 # TODO theoretically sentry here
                 continue
+            except socket.error:
+                self.__reconnect()
+                continue
+
+    def __reconnect(self):
+        self.__sock.close()
+        self.__sock: socket.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+
+        print("Connection closed by server ... trying to reconnect")
+
+        while True:
+            # Tries to reastablish connection to main java server
+            try:
+                self.__connect()
+                self.__register()
+                print("Reconnected")
+                break
+            except socket.error as e:
+                time.sleep(0.5)
 
     def run(self) -> NoReturn:
         self.__connect()
