@@ -13,7 +13,6 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.ext.declarative.api import DeclarativeMeta
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy import select
-from sqlalchemy import exc
 
 
 class IllegalArgumentError(ValueError):
@@ -154,17 +153,11 @@ class DatabaseWrapper:
         self.connection = self.session.connection()
 
     def ping(self) -> None:
-
         try:
-
             self.connection.scalar(select([1]))
-
             return
-
         except:
-
             print("Connection Timeout")
-
             self.reload()
 
 
@@ -200,10 +193,18 @@ class MicroService:
         self.__sock: socket.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
     def __send(self, data: dict) -> NoReturn:
-        self.__sock.send(str(json.dumps(data)).encode("utf-8"))
+        try:
+            self.__sock.send(str(json.dumps(data)).encode("utf-8"))
+        except socket.error:
+            self.__reconnect()
 
     def __connect(self) -> NoReturn:
-        self.__sock.connect(self._server_address)
+        while True:
+            try:
+                self.__sock.connect(self._server_address)
+                return
+            except socket.error:
+                time.sleep(0.5)
 
     def __register(self) -> NoReturn:
         self.__send({"action": "register", "name": self._name})
@@ -280,25 +281,37 @@ class MicroService:
         while True:
             try:
                 # assume all data coming from the server is well formatted
-                frame: dict = json.loads(self.__sock.recv(4096))
+                data: str = self.__sock.recv(4096)
+
+                if len(data) == 0:
+                    self.__reconnect()
+                    continue
+
+                frame: dict = json.loads(data)
 
                 threading.Thread(target=self.__exec, args=(frame,)).start()
             except json.JSONDecodeError:
                 # TODO theoretically sentry here
                 continue
             except socket.error:
-                print("Connection closed by Server ... trying to reconnect")
-
-                while True:
-                    # Tries to reastablish connection to main java server
-                    try:
-                        self.__connect()
-                        self.__register()
-                        break
-
-                    except:
-                        time.sleep(0.5)
+                self.__reconnect()
                 continue
+
+    def __reconnect(self):
+        self.__sock.close()
+        self.__sock: socket.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+
+        print("Connection closed by server ... trying to reconnect")
+
+        while True:
+            # Tries to reastablish connection to main java server
+            try:
+                self.__connect()
+                self.__register()
+                print("Reconnected")
+                break
+            except socket.error as e:
+                time.sleep(0.5)
 
     def run(self) -> NoReturn:
         self.__connect()
