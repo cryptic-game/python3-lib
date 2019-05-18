@@ -105,13 +105,13 @@ class DatabaseWrapper:
         if not os.path.exists(storage_location):
             os.makedirs(storage_location)
 
-        return create_engine('sqlite:///' + os.path.join(storage_location, filename),
-                             pool_recycle=_config['RECYCLE_POOL'])
+        return create_engine('sqlite:///' + os.path.join(storage_location, filename))
 
     @staticmethod
     def __setup_mysql(username: str, password: str, hostname: str, port: int, database: str) -> Engine:
         assert 0 < port <= 65535, "invalid port number"
-        return create_engine(f"mysql+pymysql://{username}:{password}@{hostname}:{port}/{database}")
+        return create_engine(f"mysql+pymysql://{username}:{password}@{hostname}:{port}/{database}",
+                             pool_recycle=_config['RECYCLE_POOL'])
 
     def setup_database(self) -> None:
         if _config["DBMS"] == "sqlite":
@@ -125,7 +125,7 @@ class DatabaseWrapper:
                 # "merkste selber wo das problem liegt?"
                 # thanks to google translate
                 # 19:05 15.04.2019 Head Meeting
-                raise Exception("you dumb bastard gave the port for mysql as an float value")
+                raise Exception("in qua iacet forsit animadverto se?")
             port: int = int(port)
 
             self.engine: Engine = self.__setup_mysql(
@@ -281,7 +281,7 @@ class MicroService:
         while True:
             try:
                 # assume all data coming from the server is well formatted
-                data: str = self.__sock.recv(4096)
+                data: bytes = self.__sock.recv(4096)
 
                 if len(data) == 0:
                     self.__reconnect()
