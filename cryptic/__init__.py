@@ -6,6 +6,7 @@ import time
 from os import environ
 from typing import Tuple, Dict, Callable, List, Union, NoReturn, Any, Optional
 from uuid import uuid4
+import scheme
 
 from sqlalchemy import create_engine
 from sqlalchemy.engine.base import Engine
@@ -167,6 +168,7 @@ class MicroService:
     def __init__(self, name: str, server_address: Tuple[str, int] = None):
         self._user_endpoints: Dict[Tuple, Callable] = {}
         self._ms_endpoints: Dict[Tuple, Callable] = {}
+        self._user_endpoints_requirement: Dict[Tuple, scheme.Structure] = {}
         self._name: str = name
         self._awaiting = []
         self._data = {}
@@ -197,6 +199,9 @@ class MicroService:
             self.__sock.send(str(json.dumps(data)).encode("utf-8"))
         except socket.error:
             self.__reconnect()
+        except json.JSONDecodeError:
+            print("invalid json:", data)
+            raise json.JSONDecodeError
 
     def __connect(self) -> NoReturn:
         while True:
@@ -262,6 +267,12 @@ class MicroService:
                         return
 
                     self._database.ping()
+
+                    try:
+                        data: dict = self._user_endpoints_requirement[endpoint].serialize(frame, "json")
+                    except:
+                        self.__send({"tag": tag, data: {"error": "invalid input data"}})
+
                     return_data = self._user_endpoints[endpoint](data, frame["user"])
 
                     # if the handler function does not return anything
@@ -318,7 +329,8 @@ class MicroService:
         self.__register()
         self.__start()
 
-    def __endpoint(self, path: Union[List[str], Tuple[str, ...]], for_user_request: bool = False) -> Callable:
+    def __endpoint(self, path: Union[List[str], Tuple[str, ...]], requires=None,
+                   for_user_request: bool = False) -> Callable:
         def decorator(func: Callable) -> Callable:
             if isinstance(path, list):
                 endpoint_path: Tuple[str, ...] = tuple(path)
@@ -327,8 +339,9 @@ class MicroService:
             else:
                 raise IllegalArgumentError("endpoint(...) expects a list or tuple as endpoint.")
 
-            if for_user_request:
+            if for_user_request and requires is not None:
                 self._user_endpoints[endpoint_path] = func
+                self._user_endpoints_requirement[endpoint_path] = requires
             else:
                 self._ms_endpoints[endpoint_path] = func
 
@@ -342,13 +355,18 @@ class MicroService:
     def microservice_endpoint(self, path: Union[List[str], Tuple[str, ...]]) -> Callable:
         return self.__endpoint(path, False)
 
-    def user_endpoint(self, path: Union[List[str], Tuple[str, ...]]) -> Callable:
-        return self.__endpoint(path, True)
+    def user_endpoint(self, path: Union[List[str], Tuple[str, ...]], requires: dict) -> Callable:
+
+        requires["user"] = scheme.Text(required=True, min_length=36, max_length=36, nonempty=True)
+
+        requirements: scheme.Structure = scheme.Structure(requires, name=path)
+
+        return self.__endpoint(path, requirements, True)
 
     def contact_microservice(self, name: str, endpoint: List[str], data: dict, uuid: Union[None, str] = None):
         # No new thread, because this should be called only from inside an endpoint
         if uuid is None:
-            uuid = str(uuid4())
+            uuid: str = str(uuid4())
 
         self.__send({"ms": name, "data": data, "tag": uuid, "endpoint": endpoint})
 
