@@ -268,11 +268,18 @@ class MicroService:
 
                     self._database.ping()
 
-                    if len(self._user_endpoints_requirement[endpoint]) > 1: # 1 because it always checks if user is in the request.
+                    if self._user_endpoints_requirement[
+                        endpoint] is not None:  # when you give None it will be interpreted as no validation
                         try:
                             data: dict = self._user_endpoints_requirement[endpoint].serialize(frame, "json")
                         except:
                             self.__send({"tag": tag, data: {"error": "invalid input data"}})
+                            return
+
+                    else:
+                        if "user" not in frame and frame["user"] is not str:
+                            self.__send({"tag": tag, data: {"error": "invalid input data"}})
+                            return
 
                     return_data = self._user_endpoints[endpoint](data, frame["user"])
 
@@ -358,11 +365,15 @@ class MicroService:
 
     def user_endpoint(self, path: Union[List[str], Tuple[str, ...]], requires: dict) -> Callable:
 
-        requires["user"] = scheme.Text(required=True, min_length=36, max_length=36, nonempty=True)
+        if requires != {}:
+            requires["user"] = scheme.Text(required=True, min_length=36, max_length=36, nonempty=True)
 
-        requirements: scheme.Structure = scheme.Structure(requires, name=path)
+            requirements: scheme.Structure = scheme.Structure(requires, name=path)
 
-        return self.__endpoint(path, requirements, True)
+            return self.__endpoint(path, requirements, True)
+
+        else:
+            self.__endpoint(path, None, True)
 
     def contact_microservice(self, name: str, endpoint: List[str], data: dict, uuid: Union[None, str] = None):
         # No new thread, because this should be called only from inside an endpoint

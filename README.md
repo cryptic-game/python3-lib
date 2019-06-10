@@ -34,13 +34,14 @@ user_device: dict = {
 
 @ms.microservice_endpoint(path=["microservice"])
 def handle(data: dict, microservice: str):
+    # excepts from other ms right data
     return {"name": data["yourname"]}
 
 
 @ms.user_endpoint(path=["user"], requires=user_device)
 def handle(data: dict, user: str):
     # Input is now already validated
-    print(data["username"])
+    print(user, data["active"])
     return {"ok": True}
 
 

@@ -18,14 +18,13 @@ user_device: dict = {
 
 # just giving an empty dictionary will be interpreted as no validation required.
 
-
 @ms.microservice_endpoint(path=["microservice"])
-def handle(data: dict, microservice: str):
+def handle_ms(data: dict, microservice: str):
     return {"name": data["yourname"]}
 
 
 @ms.user_endpoint(path=["user"], requires=user_device)
-def handle(data: dict, user: str):
+def handle_user(data: dict, user: str):
     # Input is now already validated
     print(data["username"])
     return {"ok": True}
