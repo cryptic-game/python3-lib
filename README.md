@@ -21,14 +21,15 @@ from scheme import *
 
 config: Config = get_config("debug")  # this sets config to debug mode
 ms: MicroService = MicroService(name="echo")
-db_wrapper = ms.get_wrapper()
+wrapper = ms.get_wrapper()
 
-user_device: dict = {  # is just an example does not have to make sense
+user_device: dict = {
     'user_uuid': Text(nonempty=True),
     'device_uuid': Email(nonempty=True),
     'active': Boolean(required=True, default=True),
     'somedata': Integer(minimum=0, default=0),
 }
+# just giving an empty dictionary will be interpreted as no validation required.
 
 
 @ms.microservice_endpoint(path=["microservice"])
@@ -47,7 +48,7 @@ if __name__ == '__main__':
     ms.run()
 
 
-class Test(db_wrapper.Base):
+class Test(wrapper.Base):
     __tablename__: str = 'test'
 
     uuid: Union[Column, str] = Column(String(36), primary_key=True, unique=True)

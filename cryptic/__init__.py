@@ -268,10 +268,11 @@ class MicroService:
 
                     self._database.ping()
 
-                    try:
-                        data: dict = self._user_endpoints_requirement[endpoint].serialize(frame, "json")
-                    except:
-                        self.__send({"tag": tag, data: {"error": "invalid input data"}})
+                    if len(self._user_endpoints_requirement[endpoint]) > 1: # 1 because it always checks if user is in the request.
+                        try:
+                            data: dict = self._user_endpoints_requirement[endpoint].serialize(frame, "json")
+                        except:
+                            self.__send({"tag": tag, data: {"error": "invalid input data"}})
 
                     return_data = self._user_endpoints[endpoint](data, frame["user"])
 
