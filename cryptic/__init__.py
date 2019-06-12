@@ -362,8 +362,7 @@ class MicroService:
     def user_endpoint(self, path: Union[List[str], Tuple[str, ...]], requires: dict) -> Callable:
 
         if requires != {}:
-            requires["user"] = scheme.Text(required=True, min_length=36, max_length=36, nonempty=True)
-
+         #   requires["user"] = scheme.Text(required=True, min_length=36, max_length=36, nonempty=True)
             requirements: scheme.Structure = scheme.Structure(requires, name=path)
 
             return self.__endpoint(path, requirements, True)
