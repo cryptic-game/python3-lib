@@ -272,12 +272,12 @@ class MicroService:
                         try:
                             data: dict = self._user_endpoints_requirement[endpoint].serialize(frame, "json")
                         except:
-                            self.__send({"tag": tag, data: {"error": "invalid input data"}})
+                            self.__send({"tag": tag, "data": {"error": "invalid input data"}})
                             return
 
                     else:
                         if "user" not in frame and frame["user"] is not str:
-                            self.__send({"tag": tag, data: {"error": "invalid input data"}})
+                            self.__send({"tag": tag, "data": {"error": "invalid input data"}})
                             return
 
                     return_data = self._user_endpoints[endpoint](data, frame["user"])
