@@ -268,8 +268,7 @@ class MicroService:
 
                     self._database.ping()
 
-                    if self._user_endpoints_requirement[
-                        endpoint] is not None:  # when you give None it will be interpreted as no validation
+                    if self._user_endpoints_requirement[endpoint] is not None:
                         try:
                             data: dict = self._user_endpoints_requirement[endpoint].serialize(frame, "json")
                         except:
@@ -347,11 +346,8 @@ class MicroService:
             else:
                 raise IllegalArgumentError("endpoint(...) expects a list or tuple as endpoint.")
 
-            if for_user_request and requires is not None:
-                self._user_endpoints[endpoint_path] = func
-                self._user_endpoints_requirement[endpoint_path] = requires
-            else:
-                self._ms_endpoints[endpoint_path] = func
+            self._user_endpoints[endpoint_path] = func
+            self._user_endpoints_requirement[endpoint_path] = requires
 
             def inner(*args, **kwargs) -> NoReturn:
                 print("This function is not directly callable.")
