@@ -369,7 +369,7 @@ class MicroService:
             return self.__endpoint(path, requirements, True)
 
         else:
-            self.__endpoint(path, None, True)
+            return self.__endpoint(path, None, True)
 
     def contact_microservice(self, name: str, endpoint: List[str], data: dict, uuid: Union[None, str] = None):
         # No new thread, because this should be called only from inside an endpoint
