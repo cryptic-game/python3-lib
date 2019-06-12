@@ -2,25 +2,39 @@ from cryptic import MicroService, get_config, Config
 from uuid import uuid4
 from sqlalchemy import Column, String
 from typing import Union
+from scheme import *
 
 config: Config = get_config("debug")  # this sets config to debug mode
 ms: MicroService = MicroService(name="echo")
-db_wrapper = ms.get_wrapper()
+wrapper = ms.get_wrapper()
 
+user_device: dict = {
+    'user_uuid': Text(nonempty=True),
+    'device_uuid': Email(nonempty=True),
+    'active': Boolean(required=True, default=True),
+    'somedata': Integer(minimum=0, default=0),
+}
+
+
+# just giving an empty dictionary will be interpreted as no validation required.
 
 @ms.microservice_endpoint(path=["microservice"])
-def handle(data: dict, microservice: str):
-    print(data, microservice)
-    return {}
+def handle_ms(data: dict, microservice: str):
+    return {"name": data["yourname"]}
 
 
-@ms.user_endpoint(path=["user"])
-def handle(data: dict, user: str):
-    print(data, user)
-    return {}
+@ms.user_endpoint(path=["user"], requires=user_device)
+def handle_user(data: dict, user: str):
+    # Input is now already validated
+    print(data["username"])
+    return {"ok": True}
 
 
-class Test(db_wrapper.Base):
+if __name__ == '__main__':
+    ms.run()
+
+
+class Test(wrapper.Base):
     __tablename__: str = 'test'
 
     uuid: Union[Column, str] = Column(String(36), primary_key=True, unique=True)
@@ -29,6 +43,9 @@ class Test(db_wrapper.Base):
     @staticmethod
     def create(name: str) -> 'Test':
         my_test: Test = Test(uuid=str(uuid4()), name=name)
+
+        wrapper.session.add(my_test)
+        wrapper.session.commit()
 
         return my_test
 
