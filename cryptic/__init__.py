@@ -6,14 +6,14 @@ import time
 from os import environ
 from typing import Tuple, Dict, Callable, List, Union, NoReturn, Any, Optional
 from uuid import uuid4
-import scheme
 
+import scheme
 from sqlalchemy import create_engine
+from sqlalchemy import select
 from sqlalchemy.engine.base import Engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.ext.declarative.api import DeclarativeMeta
 from sqlalchemy.orm import sessionmaker
-from sqlalchemy import select
 
 
 class IllegalArgumentError(ValueError):
@@ -337,7 +337,8 @@ class MicroService:
         self.__register()
         self.__start()
 
-    def __endpoint(self, path: Union[List[str], Tuple[str, ...]], requires=None, for_user_request: bool = False) -> Callable:
+    def __endpoint(self, path: Union[List[str], Tuple[str, ...]], requires: Optional[scheme.Structure] = None,
+                   for_user_request: bool = False) -> Callable:
         def decorator(func: Callable) -> Callable:
             if isinstance(path, list):
                 endpoint_path: Tuple[str, ...] = tuple(path)
@@ -362,11 +363,15 @@ class MicroService:
     def microservice_endpoint(self, path: Union[List[str], Tuple[str, ...]]) -> Callable:
         return self.__endpoint(path, None, False)
 
-    def user_endpoint(self, path: Union[List[str], Tuple[str, ...]], requires: Dict[str, scheme.field.Field]) -> Callable:
-        for req in requires.values():
-            req.required = True
-        requirements: scheme.Structure = scheme.Structure(requires, name="/".join(path))
-        return self.__endpoint(path, requirements, True)
+    def user_endpoint(self, path: Union[List[str], Tuple[str, ...]],
+                      requires: Optional[Dict[str, scheme.field.Field]]) -> Callable:
+        if requires is not None:
+            for req in requires.values():
+                req.required = True
+            requirements: scheme.Structure = scheme.Structure(requires, name="/".join(path))
+            return self.__endpoint(path, requirements, True)
+        else:
+            return self.__endpoint(path, None, True)
 
     def contact_microservice(self, name: str, endpoint: List[str], data: dict, uuid: Union[None, str] = None):
         # No new thread, because this should be called only from inside an endpoint
