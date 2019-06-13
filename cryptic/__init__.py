@@ -168,7 +168,7 @@ class MicroService:
     def __init__(self, name: str, server_address: Tuple[str, int] = None):
         self._user_endpoints: Dict[Tuple, Callable] = {}
         self._ms_endpoints: Dict[Tuple, Callable] = {}
-        self._user_endpoints_requirement: Dict[Tuple, scheme.Structure] = {}
+        self._user_endpoint_requirements: Dict[Tuple, scheme.Structure] = {}
         self._name: str = name
         self._awaiting = []
         self._data = {}
@@ -268,17 +268,17 @@ class MicroService:
 
                     self._database.ping()
 
-                    if self._user_endpoints_requirement[endpoint] is not None:
+                    requirements: scheme.Structure = self._user_endpoint_requirements[endpoint]
+                    if requirements is not None:
                         try:
-                            data: dict = self._user_endpoints_requirement[endpoint].serialize(frame, "json")
-                        except Exception as e:
-                            print(str(e))
-                            self.__send({"tag": tag, "data": {"error": "invalid input data"}})
-                            return
-
-                    else:
-                        if "user" not in frame and type(frame["user"]) is not str:
-                            self.__send({"tag": tag, "data": {"error": "invalid input data"}})
+                            requirements.serialize(data, 'json')
+                        except:
+                            self.__send({
+                                "tag": tag,
+                                "data": {
+                                    "error": "invalid input data"
+                                }
+                            })
                             return
 
                     return_data = self._user_endpoints[endpoint](data, frame["user"])
@@ -337,8 +337,7 @@ class MicroService:
         self.__register()
         self.__start()
 
-    def __endpoint(self, path: Union[List[str], Tuple[str, ...]], requires=None,
-                   for_user_request: bool = False) -> Callable:
+    def __endpoint(self, path: Union[List[str], Tuple[str, ...]], requires=None, for_user_request: bool = False) -> Callable:
         def decorator(func: Callable) -> Callable:
             if isinstance(path, list):
                 endpoint_path: Tuple[str, ...] = tuple(path)
@@ -347,8 +346,11 @@ class MicroService:
             else:
                 raise IllegalArgumentError("endpoint(...) expects a list or tuple as endpoint.")
 
-            self._user_endpoints[endpoint_path] = func
-            self._user_endpoints_requirement[endpoint_path] = requires
+            if for_user_request:
+                self._user_endpoints[endpoint_path] = func
+                self._user_endpoint_requirements[endpoint_path] = requires
+            else:
+                self._ms_endpoints[endpoint_path] = func
 
             def inner(*args, **kwargs) -> NoReturn:
                 print("This function is not directly callable.")
@@ -358,23 +360,18 @@ class MicroService:
         return decorator
 
     def microservice_endpoint(self, path: Union[List[str], Tuple[str, ...]]) -> Callable:
-        return self.__endpoint(path, False)
+        return self.__endpoint(path, None, False)
 
-    def user_endpoint(self, path: Union[List[str], Tuple[str, ...]], requires: dict) -> Callable:
-
-        if requires != {}:
-         #   requires["user"] = scheme.Text(required=True, min_length=36, max_length=36, nonempty=True)
-            requirements: scheme.Structure = scheme.Structure(requires, name=path)
-
-            return self.__endpoint(path, requirements, True)
-
-        else:
-            return self.__endpoint(path, None, True)
+    def user_endpoint(self, path: Union[List[str], Tuple[str, ...]], requires: Dict[str, scheme.field.Field]) -> Callable:
+        for req in requires.values():
+            req.required = True
+        requirements: scheme.Structure = scheme.Structure(requires, name="/".join(path))
+        return self.__endpoint(path, requirements, True)
 
     def contact_microservice(self, name: str, endpoint: List[str], data: dict, uuid: Union[None, str] = None):
         # No new thread, because this should be called only from inside an endpoint
         if uuid is None:
-            uuid: str = str(uuid4())
+            uuid = str(uuid4())
 
         self.__send({"ms": name, "data": data, "tag": uuid, "endpoint": endpoint})
 
