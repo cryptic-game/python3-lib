@@ -230,7 +230,7 @@ class MicroService:
                             "tag": tag,
                             "user": frame["user"],
                             "data": {
-                                "error": "unknown service"
+                                "error": "unknown_service"
                             }
                         })
                         return
@@ -261,7 +261,7 @@ class MicroService:
                             "tag": tag,
                             "user": frame["user"],
                             "data": {
-                                "error": "unknown service"
+                                "error": "unknown_service"
                             }
                         })
                         return
@@ -276,7 +276,7 @@ class MicroService:
                             self.__send({
                                 "tag": tag,
                                 "data": {
-                                    "error": "invalid input data"
+                                    "error": "invalid_input_data"
                                 }
                             })
                             return
