@@ -159,9 +159,6 @@ class DatabaseWrapper:
             self.connection.scalar(select([1]))
             return
         except Exception as e:
-
-            logging.info("DB Connection timeout ... reloading")
-
             self.reload()
 
 
@@ -175,15 +172,8 @@ class MicroService:
         self._name: str = name
         self._awaiting = []
         self._data = {}
-
-        if _config["PATH_LOGFILE"] != "":
-            logging.basicConfig(
-                filename=_config["PATH_LOGFILE"] + name + ".log",
-                filemode="w",
-                format="%(asctime)s - %(levelname)s - %(message)s",
-            )
-        else:
-            logging.basicConfig(format="%(asctime)s - %(levelname)s - %(message)s")
+        self.logger = logging.Logger(name)
+        self.__setup_logger()
 
         self._database = DatabaseWrapper()
 
@@ -206,6 +196,26 @@ class MicroService:
             self._server_address: Tuple[str, int] = tuple(self._server_address)
 
         self.__sock: socket.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+
+    def __setup_logger(self):
+
+        console_handler: logging.StreamHandler = logging.StreamHandler()
+        console_handler.setLevel(logging.INFO)
+        console_format: logging.Formatter = logging.Formatter("%(levelname)s - %(message)s")
+        console_handler.setFormatter(console_format)
+
+        if _config["PATH_LOGFILE"] != "" and _config["PATH_LOGFILE"][-1] == "/":
+
+            file_handler: logging.FileHandler = logging.FileHandler(_config["PATH_LOGFILE"] + self._name + ".log")
+            file_handler.setLevel(logging.DEBUG)
+            file_format: logging.Formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
+            file_handler.setFormatter(file_format)
+
+            self.logger.addHandler(file_handler)
+
+        self.logger.addHandler(console_handler)
+
+        self.logger.info("logger configured ...")
 
     def __send(self, data: dict) -> NoReturn:
         try:
@@ -238,7 +248,7 @@ class MicroService:
             else:
                 if "ms" in frame:
                     if endpoint not in self._ms_endpoints:
-                        logging.debug("ms requested: " + str(endpoint) + " Endpoint not found")
+                        self.logger.debug("ms requested: " + str(endpoint) + " Endpoint not found")
                         self.__send({"tag": tag, "ms": frame["ms"], "data": {"error": "unknown_service"}})
                         return
 
@@ -250,10 +260,10 @@ class MicroService:
                         return_data = self._ms_endpoints[endpoint](data, requesting_microservice)
 
                     except Exception as e:
-                        logging.error(
+                        self.logger.error(
                             "Error while executing ms endpoint: " + str(endpoint) + " with data: " + str(data)
                         )
-                        logging.error("Stacktrace:", exc_info=True)
+                        self.logger.error("Stacktrace:", exc_info=True)
 
                         return_data = {}
 
@@ -270,7 +280,7 @@ class MicroService:
 
                 elif "user" in frame:
                     if endpoint not in self._user_endpoints:
-                        logging.debug("user requested: " + str(endpoint) + " Endpoint not found")
+                        self.logger.debug("user requested: " + str(endpoint) + " Endpoint not found")
                         self.__send({"tag": tag, "user": frame["user"], "data": {"error": "unknown_service"}})
                         return
 
@@ -281,7 +291,7 @@ class MicroService:
                         try:
                             requirements.serialize(data, "json")
                         except:
-                            logging.debug("invalid input data: " + str(data))
+                            self.logger.debug("invalid input data: " + str(data))
 
                             self.__send({"tag": tag, "data": {"error": "invalid_input_data"}})
                             return
@@ -289,10 +299,10 @@ class MicroService:
                     try:
                         return_data = self._user_endpoints[endpoint](data, frame["user"])
                     except Exception as e:
-                        logging.error(
+                        self.logger.error(
                             "Error while executing user endpoint: " + str(endpoint) + " with data: " + str(data)
                         )
-                        logging.error("Stacktrace:", exc_info=True)
+                        self.logger.error("Stacktrace:", exc_info=True)
 
                         return_data = {}
 
@@ -322,12 +332,12 @@ class MicroService:
                 threading.Thread(target=self.__exec, args=(frame,)).start()
             except json.JSONDecodeError:
 
-                logging.error("Error when trying to load json: " + str(data))
+                self.logger.error("Error when trying to load json: " + str(data))
 
                 continue
             except socket.error:
 
-                logging.info("Lost connection to main server ... reconnect")
+                self.logger.info("Lost connection to main server ... reconnect")
                 self.__reconnect()
                 continue
 
