@@ -6,6 +6,7 @@ import time
 from os import environ
 from typing import Tuple, Dict, Callable, List, Union, NoReturn, Any, Optional
 from uuid import uuid4
+import logging
 
 import scheme
 from sqlalchemy import create_engine
@@ -34,16 +35,17 @@ class UnknownModeError(ValueError):
 
 class Config:
     to_load: List[Tuple[str, str]] = [
-        ('MODE', 'production'),
-        ('DATA_LOCATION', 'data/'),
-        ('DBMS', 'sqlite'),
-        ('SQLITE_FILE', 'data.db'),
-        ('MYSQL_HOSTNAME', ''),  # as MYSQL_... is not the default, we don't need default values
-        ('MYSQL_PORT', ''),
-        ('MYSQL_DATABASE', ''),
-        ('MYSQL_USERNAME', ''),
-        ('MYSQL_PASSWORD', ''),
-        ('RECYCLE_POOL', 1550)
+        ("MODE", "production"),
+        ("DATA_LOCATION", "data/"),
+        ("DBMS", "sqlite"),
+        ("SQLITE_FILE", "data.db"),
+        ("MYSQL_HOSTNAME", ""),  # as MYSQL_... is not the default, we don't need default values
+        ("MYSQL_PORT", ""),
+        ("MYSQL_DATABASE", ""),
+        ("MYSQL_USERNAME", ""),
+        ("MYSQL_PASSWORD", ""),
+        ("RECYCLE_POOL", 1550),
+        ("PATH_LOGFILE", "log_files/"),
     ]
 
     def __init__(self):
@@ -81,7 +83,6 @@ _config = Config()
 
 
 class DatabaseWrapper:
-
     def __init__(self):
         if _config["MODE"] == "debug":
             _config["DBMS"] = "sqlite"
@@ -106,19 +107,19 @@ class DatabaseWrapper:
         if not os.path.exists(storage_location):
             os.makedirs(storage_location)
 
-        return create_engine('sqlite:///' + os.path.join(storage_location, filename))
+        return create_engine("sqlite:///" + os.path.join(storage_location, filename))
 
     @staticmethod
     def __setup_mysql(username: str, password: str, hostname: str, port: int, database: str) -> Engine:
         assert 0 < port <= 65535, "invalid port number"
-        return create_engine(f"mysql+pymysql://{username}:{password}@{hostname}:{port}/{database}",
-                             pool_recycle=_config['RECYCLE_POOL'])
+        return create_engine(
+            f"mysql+pymysql://{username}:{password}@{hostname}:{port}/{database}", pool_recycle=_config["RECYCLE_POOL"]
+        )
 
     def setup_database(self) -> None:
         if _config["DBMS"] == "sqlite":
             self.engine: Engine = self.__setup_sqlite(
-                filename=_config["SQLITE_FILE"],
-                storage_location=_config["DATA_LOCATION"]
+                filename=_config["SQLITE_FILE"], storage_location=_config["DATA_LOCATION"]
             )
         elif _config["DBMS"] == "mysql":
             port: str = _config["MYSQL_PORT"]
@@ -134,7 +135,7 @@ class DatabaseWrapper:
                 password=_config["MYSQL_PASSWORD"],
                 hostname=_config["MYSQL_HOSTNAME"],
                 port=port,
-                database=_config["MYSQL_DATABASE"]
+                database=_config["MYSQL_DATABASE"],
             )
         else:
             raise UnknownDBMSTypeError(f"the DBMS {_config['DBMS']} is unknown")
@@ -157,8 +158,10 @@ class DatabaseWrapper:
         try:
             self.connection.scalar(select([1]))
             return
-        except:
-            print("Connection Timeout")
+        except Exception as e:
+
+            logging.info("DB Connection timeout ... reloading")
+
             self.reload()
 
 
@@ -172,6 +175,16 @@ class MicroService:
         self._name: str = name
         self._awaiting = []
         self._data = {}
+
+        if _config["PATH_LOGFILE"] != "":
+            logging.basicConfig(
+                filename=_config["PATH_LOGFILE"] + name + ".log",
+                filemode="w",
+                format="%(asctime)s - %(levelname)s - %(message)s",
+            )
+        else:
+            logging.basicConfig(format="%(asctime)s - %(levelname)s - %(message)s")
+
         self._database = DatabaseWrapper()
 
         if server_address is not None:
@@ -181,13 +194,13 @@ class MicroService:
             self._server_address: Tuple[str, int] = server_address
         else:
             # use defaults
-            self._server_address: List = ['127.0.0.1', 1239]
+            self._server_address: List = ["127.0.0.1", 1239]
 
             # overwrite if environment variable given
-            if 'SERVER_HOST' in environ:
-                self._server_address[0] = environ['SERVER_HOST']
-            if 'SERVER_PORT' in environ:
-                self._server_address[1] = int(environ['SERVER_PORT'])
+            if "SERVER_HOST" in environ:
+                self._server_address[0] = environ["SERVER_HOST"]
+            if "SERVER_PORT" in environ:
+                self._server_address[1] = int(environ["SERVER_PORT"])
 
             # convert to tuple
             self._server_address: Tuple[str, int] = tuple(self._server_address)
@@ -225,20 +238,24 @@ class MicroService:
             else:
                 if "ms" in frame:
                     if endpoint not in self._ms_endpoints:
-                        # MAYBE add sentry here
-                        self.__send({
-                            "tag": tag,
-                            "user": frame["user"],
-                            "data": {
-                                "error": "unknown_service"
-                            }
-                        })
+                        logging.debug("ms requested: " + str(endpoint) + " Endpoint not found")
+                        self.__send({"tag": tag, "ms": frame["ms"], "data": {"error": "unknown_service"}})
                         return
 
                     requesting_microservice = frame["ms"]
 
                     self._database.ping()
-                    return_data = self._ms_endpoints[endpoint](data, requesting_microservice)
+
+                    try:
+                        return_data = self._ms_endpoints[endpoint](data, requesting_microservice)
+
+                    except Exception as e:
+                        logging.error(
+                            "Error while executing ms endpoint: " + str(endpoint) + " with data: " + str(data)
+                        )
+                        logging.error("Stacktrace:", exc_info=True)
+
+                        return_data = {}
 
                     # if the handler function does not return anything
                     if return_data is None:
@@ -246,24 +263,15 @@ class MicroService:
                     else:
                         if not isinstance(return_data, dict):
                             raise IllegalReturnTypeError(
-                                "all handler functions are expected to return either noting or a dict.")
+                                "all handler functions are expected to return either noting or a dict."
+                            )
 
-                    self.__send({
-                        "ms": requesting_microservice,
-                        "endpoint": [],
-                        "tag": tag,
-                        "data": return_data
-                    })
+                    self.__send({"ms": requesting_microservice, "endpoint": [], "tag": tag, "data": return_data})
+
                 elif "user" in frame:
                     if endpoint not in self._user_endpoints:
-                        # MAYBE add sentry here
-                        self.__send({
-                            "tag": tag,
-                            "user": frame["user"],
-                            "data": {
-                                "error": "unknown_service"
-                            }
-                        })
+                        logging.debug("user requested: " + str(endpoint) + " Endpoint not found")
+                        self.__send({"tag": tag, "user": frame["user"], "data": {"error": "unknown_service"}})
                         return
 
                     self._database.ping()
@@ -271,17 +279,22 @@ class MicroService:
                     requirements: scheme.Structure = self._user_endpoint_requirements[endpoint]
                     if requirements is not None:
                         try:
-                            requirements.serialize(data, 'json')
+                            requirements.serialize(data, "json")
                         except:
-                            self.__send({
-                                "tag": tag,
-                                "data": {
-                                    "error": "invalid_input_data"
-                                }
-                            })
+                            logging.debug("invalid input data: " + str(data))
+
+                            self.__send({"tag": tag, "data": {"error": "invalid_input_data"}})
                             return
 
-                    return_data = self._user_endpoints[endpoint](data, frame["user"])
+                    try:
+                        return_data = self._user_endpoints[endpoint](data, frame["user"])
+                    except Exception as e:
+                        logging.error(
+                            "Error while executing user endpoint: " + str(endpoint) + " with data: " + str(data)
+                        )
+                        logging.error("Stacktrace:", exc_info=True)
+
+                        return_data = {}
 
                     # if the handler function does not return anything
                     if return_data is None:
@@ -289,12 +302,10 @@ class MicroService:
                     else:
                         if not isinstance(return_data, dict):
                             raise IllegalReturnTypeError(
-                                "all handler functions are expected to return either noting or a dict.")
+                                "all handler functions are expected to return either noting or a dict."
+                            )
 
-                    self.__send({
-                        "tag": tag,
-                        "data": return_data
-                    })
+                    self.__send({"tag": tag, "data": return_data})
 
     def __start(self) -> NoReturn:
         while True:
@@ -310,9 +321,13 @@ class MicroService:
 
                 threading.Thread(target=self.__exec, args=(frame,)).start()
             except json.JSONDecodeError:
-                # TODO theoretically sentry here
+
+                logging.error("Error when trying to load json: " + str(data))
+
                 continue
             except socket.error:
+
+                logging.info("Lost connection to main server ... reconnect")
                 self.__reconnect()
                 continue
 
@@ -337,8 +352,12 @@ class MicroService:
         self.__register()
         self.__start()
 
-    def __endpoint(self, path: Union[List[str], Tuple[str, ...]], requires: Optional[scheme.Structure] = None,
-                   for_user_request: bool = False) -> Callable:
+    def __endpoint(
+        self,
+        path: Union[List[str], Tuple[str, ...]],
+        requires: Optional[scheme.Structure] = None,
+        for_user_request: bool = False,
+    ) -> Callable:
         def decorator(func: Callable) -> Callable:
             if isinstance(path, list):
                 endpoint_path: Tuple[str, ...] = tuple(path)
@@ -363,8 +382,9 @@ class MicroService:
     def microservice_endpoint(self, path: Union[List[str], Tuple[str, ...]]) -> Callable:
         return self.__endpoint(path, None, False)
 
-    def user_endpoint(self, path: Union[List[str], Tuple[str, ...]],
-                      requires: Optional[Dict[str, scheme.field.Field]]) -> Callable:
+    def user_endpoint(
+        self, path: Union[List[str], Tuple[str, ...]], requires: Optional[Dict[str, scheme.field.Field]]
+    ) -> Callable:
         if requires is not None:
             for req in requires.values():
                 req.required = True
@@ -398,16 +418,12 @@ class MicroService:
         return data
 
     def contact_user(self, user_id: str, data: dict):
-        self.__send({
-            "action": "address",
-            "user": user_id,
-            "data": data
-        })
+        self.__send({"action": "address", "user": user_id, "data": data})
 
     def get_db_session(self) -> Tuple[Engine, DeclarativeMeta, Any]:
         return self._database.engine, self._database.Base, self._database.session
 
-    def get_wrapper(self) -> 'DatabaseWrapper':
+    def get_wrapper(self) -> "DatabaseWrapper":
         return self._database
 
 
