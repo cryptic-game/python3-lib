@@ -16,6 +16,9 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.ext.declarative.api import DeclarativeMeta
 from sqlalchemy.orm import sessionmaker
 
+import sentry_sdk
+from sentry_sdk import capture_exception, configure_scope
+
 
 class IllegalArgumentError(ValueError):
     pass
@@ -46,6 +49,7 @@ class Config:
         ("MYSQL_PASSWORD", ""),
         ("RECYCLE_POOL", 1550),
         ("PATH_LOGFILE", "log_files/"),
+        ("DSN", ""),  # Data Source Name ... needed for connecting to Sentry
     ]
 
     def __init__(self):
@@ -81,6 +85,49 @@ class Config:
 
 _config = Config()
 
+
+class Sentry(logging.Logger):
+    def __init__(self, name):
+        super().__init__(self, name)
+        self.__setup_logger()
+        self.__setup_sentry()
+        self.__using_sentry: bool = False
+        self._name: str = name
+
+    def __setup_logger(self) -> None:
+
+        console_handler: logging.StreamHandler = logging.StreamHandler()
+        console_handler.setLevel(logging.INFO)
+        console_format: logging.Formatter = logging.Formatter("%(levelname)s - %(message)s")
+        console_handler.setFormatter(console_format)
+
+        if _config["PATH_LOGFILE"] != "" and _config["PATH_LOGFILE"][-1] == "/":
+
+            file_handler: logging.FileHandler = logging.FileHandler(_config["PATH_LOGFILE"] + self._name + ".log")
+            file_handler.setLevel(logging.DEBUG)
+            file_format: logging.Formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
+            file_handler.setFormatter(file_format)
+
+            self.addHandler(file_handler)
+
+        self.addHandler(console_handler)
+
+        self.info("logger configured ...")
+
+    def __setup_sentry(self) -> None:
+        if _config["DSN"] != "":
+            sentry_sdk.init(dsn=_config["DSN"])
+            self.__using_sentry = True
+            logging.info("Setup SDK was performed DSN:", _config["DSN"])
+
+    def capture_exception(self, e: Exception, **kwargs) -> None:
+        self.error(e, exc_info=True)
+        if self.__using_sentry:
+            capture_exception(e)
+            with configure_scope() as scope:
+                for key in kwargs:
+                    scope.set_extra(key, kwargs[key])
+                    # .set_context has reserved keys we use set_extra too avoid such rare case
 
 class DatabaseWrapper:
     def __init__(self):
@@ -166,16 +213,14 @@ class MicroService:
     SERVICE_REQUEST_MAX_TIMEOUT = 10
 
     def __init__(self, name: str, server_address: Tuple[str, int] = None):
+        self._sentry: Sentry = Sentry(name)
         self._user_endpoints: Dict[Tuple, Callable] = {}
         self._ms_endpoints: Dict[Tuple, Callable] = {}
         self._user_endpoint_requirements: Dict[Tuple, scheme.Structure] = {}
         self._name: str = name
         self._awaiting = []
         self._data = {}
-        self.logger = logging.Logger(name)
-        self.__setup_logger()
-
-        self._database = DatabaseWrapper()
+        self._database: DatabaseWrapper = DatabaseWrapper()
 
         if server_address is not None:
             assert len(server_address) == 2, "the server host tuple has to be like (str, int)"
@@ -197,34 +242,14 @@ class MicroService:
 
         self.__sock: socket.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
-    def __setup_logger(self):
-
-        console_handler: logging.StreamHandler = logging.StreamHandler()
-        console_handler.setLevel(logging.INFO)
-        console_format: logging.Formatter = logging.Formatter("%(levelname)s - %(message)s")
-        console_handler.setFormatter(console_format)
-
-        if _config["PATH_LOGFILE"] != "" and _config["PATH_LOGFILE"][-1] == "/":
-
-            file_handler: logging.FileHandler = logging.FileHandler(_config["PATH_LOGFILE"] + self._name + ".log")
-            file_handler.setLevel(logging.DEBUG)
-            file_format: logging.Formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
-            file_handler.setFormatter(file_format)
-
-            self.logger.addHandler(file_handler)
-
-        self.logger.addHandler(console_handler)
-
-        self.logger.info("logger configured ...")
-
     def __send(self, data: dict) -> NoReturn:
         try:
             self.__sock.send(str(json.dumps(data)).encode("utf-8"))
         except socket.error:
             self.__reconnect()
-        except json.JSONDecodeError:
-            print("invalid json:", data)
-            raise json.JSONDecodeError
+        except json.JSONDecodeError as e:
+            self._sentry.info("invalid json:", data)
+            self._sentry.capture_exception(e)
 
     def __connect(self) -> NoReturn:
         while True:
@@ -248,7 +273,7 @@ class MicroService:
             else:
                 if "ms" in frame:
                     if endpoint not in self._ms_endpoints:
-                        self.logger.debug("ms requested: " + str(endpoint) + " Endpoint not found")
+                        self._sentry.debug("ms requested: " + str(endpoint) + " Endpoint not found")
                         self.__send({"tag": tag, "ms": frame["ms"], "data": {"error": "unknown_service"}})
                         return
 
@@ -260,10 +285,7 @@ class MicroService:
                         return_data = self._ms_endpoints[endpoint](data, requesting_microservice)
 
                     except Exception as e:
-                        self.logger.error(
-                            "Error while executing ms endpoint: " + str(endpoint) + " with data: " + str(data)
-                        )
-                        self.logger.error("Stacktrace:", exc_info=True)
+                        self._sentry.capture_exception(e)
 
                         return_data = {}
 
@@ -280,7 +302,7 @@ class MicroService:
 
                 elif "user" in frame:
                     if endpoint not in self._user_endpoints:
-                        self.logger.debug("user requested: " + str(endpoint) + " Endpoint not found")
+                        self._sentry.debug("user requested: " + str(endpoint) + " Endpoint not found")
                         self.__send({"tag": tag, "user": frame["user"], "data": {"error": "unknown_service"}})
                         return
 
@@ -291,7 +313,7 @@ class MicroService:
                         try:
                             requirements.serialize(data, "json")
                         except:
-                            self.logger.debug("invalid input data: " + str(data))
+                            self._sentry.debug("invalid input data: " + str(data))
 
                             self.__send({"tag": tag, "data": {"error": "invalid_input_data"}})
                             return
@@ -299,11 +321,7 @@ class MicroService:
                     try:
                         return_data = self._user_endpoints[endpoint](data, frame["user"])
                     except Exception as e:
-                        self.logger.error(
-                            "Error while executing user endpoint: " + str(endpoint) + " with data: " + str(data)
-                        )
-                        self.logger.error("Stacktrace:", exc_info=True)
-
+                        self._sentry.capture_exception(e)
                         return_data = {}
 
                     # if the handler function does not return anything
@@ -330,14 +348,14 @@ class MicroService:
                 frame: dict = json.loads(data)
 
                 threading.Thread(target=self.__exec, args=(frame,)).start()
-            except json.JSONDecodeError:
+            except json.JSONDecodeError as e:
 
-                self.logger.error("Error when trying to load json: " + str(data))
-
+                self._sentry.debug("Error when trying to load json: " + str(data))
+                self._sentry.capture_exception(e)
                 continue
             except socket.error:
 
-                self.logger.info("Lost connection to main server ... reconnect")
+                self._sentry.info("Lost connection to main server ... reconnect")
                 self.__reconnect()
                 continue
 
