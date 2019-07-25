@@ -96,7 +96,6 @@ class Sentry(logging.Logger):
         self._name: str = name
 
     def __setup_logger(self) -> None:
-
         console_handler: logging.StreamHandler = logging.StreamHandler()
         console_handler.setLevel(logging.INFO)
         console_format: logging.Formatter = logging.Formatter("%(levelname)s - %(message)s")
