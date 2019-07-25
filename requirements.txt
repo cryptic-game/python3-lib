@@ -2,3 +2,4 @@ uuid
 SQLAlchemy
 PyMySQL
 scheme
+sentry_sdk

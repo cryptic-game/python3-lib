@@ -50,6 +50,7 @@ class Config:
         ("RECYCLE_POOL", 1550),
         ("PATH_LOGFILE", "log_files/"),
         ("DSN", ""),  # Data Source Name ... needed for connecting to Sentry
+        ("RELEASE", ""),
     ]
 
     def __init__(self):
@@ -116,7 +117,7 @@ class Sentry(logging.Logger):
 
     def __setup_sentry(self) -> None:
         if _config["DSN"] != "":
-            sentry_sdk.init(dsn=_config["DSN"])
+            sentry_sdk.init(dsn=_config["DSN"], release=_config["RELEASE"])
             self.__using_sentry = True
             logging.info("Setup SDK was performed DSN:", _config["DSN"])
 
@@ -128,6 +129,7 @@ class Sentry(logging.Logger):
                 for key in kwargs:
                     scope.set_extra(key, kwargs[key])
                     # .set_context has reserved keys we use set_extra too avoid such rare case
+
 
 class DatabaseWrapper:
     def __init__(self):
