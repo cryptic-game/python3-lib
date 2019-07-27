@@ -11,7 +11,7 @@ if os.path.isfile(requirementPath):
 
 with open("./README.md", "r") as f:
     file: str = f.read()
-print(install_requires)
+
 setup(
     name="cryptic-game",
     version="0.3.5",
