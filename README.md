@@ -19,7 +19,7 @@ $ pip3 install cryptic-game
 
 ## Quick Start
 
-Checkout the example.py for an quick example how this library is used.
+Checkout the [example.py](https://github.com/cryptic-game/python3-lib/blob/master/example.py) for an quick example how this library is used.
 
 ## Requirements
 
