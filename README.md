@@ -15,7 +15,7 @@ $ pip3 install cryptic-game
 - Endpoint Mapping
 - automatic input validation
 - Database Control
-- Sentry and Logger -> Stacktraces and given Data
+- Sentry and Logger -> Stacktraces and Context Data
 
 ## Quick Start
 

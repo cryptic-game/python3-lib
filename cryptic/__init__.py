@@ -89,11 +89,11 @@ _config = Config()
 
 class Sentry(logging.Logger):
     def __init__(self, name):
-        super().__init__(self, name)
-        self.__setup_logger()
-        self.__setup_sentry()
+        super().__init__(self, logging.INFO)
         self.__using_sentry: bool = False
         self._name: str = name
+        self.__setup_logger()
+        self.__setup_sentry()
 
     def __setup_logger(self) -> None:
         console_handler: logging.StreamHandler = logging.StreamHandler()
@@ -249,8 +249,8 @@ class MicroService:
         except socket.error:
             self.__reconnect()
         except json.JSONDecodeError as e:
-            self._sentry.info("invalid json:", data)
-            self._sentry.capture_exception(e)
+            self._sentry.info("invalid json:", str(data))
+            self._sentry.capture_exception(e, data=data)
 
     def __connect(self) -> NoReturn:
         while True:
@@ -286,7 +286,7 @@ class MicroService:
                         return_data = self._ms_endpoints[endpoint](data, requesting_microservice)
 
                     except Exception as e:
-                        self._sentry.capture_exception(e)
+                        self._sentry.capture_exception(e, endpoint=endpoint, data=frame)
 
                         return_data = {}
 
@@ -322,7 +322,7 @@ class MicroService:
                     try:
                         return_data = self._user_endpoints[endpoint](data, frame["user"])
                     except Exception as e:
-                        self._sentry.capture_exception(e)
+                        self._sentry.capture_exception(e, endpoint=endpoint, data=frame)
                         return_data = {}
 
                     # if the handler function does not return anything
@@ -352,7 +352,7 @@ class MicroService:
             except json.JSONDecodeError as e:
 
                 self._sentry.debug("Error when trying to load json: " + str(data))
-                self._sentry.capture_exception(e)
+                self._sentry.capture_exception(e, data=str(data))
                 continue
             except socket.error:
 
