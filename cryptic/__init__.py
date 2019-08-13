@@ -48,7 +48,7 @@ class Config:
         ("MYSQL_USERNAME", ""),
         ("MYSQL_PASSWORD", ""),
         ("RECYCLE_POOL", 1550),
-        ("PATH_LOGFILE", "log_files/"),
+        ("PATH_LOGFILE", ""),
         ("DSN", ""),  # Data Source Name ... needed for connecting to Sentry
         ("RELEASE", ""),
     ]
@@ -454,6 +454,20 @@ class MicroService:
 
     def get_wrapper(self) -> "DatabaseWrapper":
         return self._database
+
+    def check_user_uuid(self, user_uuid: str) -> bool:
+        uuid: str = str(uuid4())
+        self.__send({"action": "check_uuid", "data": {"user": user_uuid}, "tag": uuid})
+
+        while uuid not in self._data.keys():
+            time.sleep(0.0001)
+
+        response: dict = self._data[uuid]
+
+        self._awaiting.remove(uuid)
+        del self._data[uuid]
+
+        return response["valid"]
 
 
 def get_config(mode: Optional[str] = None) -> Config:
