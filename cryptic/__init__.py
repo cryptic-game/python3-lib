@@ -313,9 +313,8 @@ class MicroService:
                     if requirements is not None:
                         try:
                             requirements.serialize(data, "json")
-                        except:
+                        except Exception as e:
                             self._sentry.debug("invalid input data: " + str(data))
-
                             self.__send({"tag": tag, "data": {"error": "invalid_input_data"}})
                             return
 
@@ -457,7 +456,7 @@ class MicroService:
 
     def check_user_uuid(self, user_uuid: str) -> bool:
         uuid: str = str(uuid4())
-        self.__send({"action": "check_uuid", "data": {"user": user_uuid}, "tag": uuid})
+        self.__send({"action": "user", "data": {"user": user_uuid}, "tag": uuid})
 
         while uuid not in self._data.keys():
             time.sleep(0.0001)
@@ -468,6 +467,23 @@ class MicroService:
         del self._data[uuid]
 
         return response["valid"]
+
+    def get_user_data(self, user_uuid: str) -> bool:
+        uuid: str = str(uuid4())
+        self.__send({"action": "user", "data": {"user": user_uuid}, "tag": uuid})
+
+        while uuid not in self._data.keys():
+            time.sleep(0.0001)
+
+        response: dict = self._data[uuid]
+
+        self._awaiting.remove(uuid)
+
+        if response["valid"]:
+            return response["data"]
+
+        else:
+            return {"error": "invalid_user_uuid"}
 
 
 def get_config(mode: Optional[str] = None) -> Config:
