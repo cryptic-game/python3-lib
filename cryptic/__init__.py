@@ -468,7 +468,7 @@ class MicroService:
 
         return response["valid"]
 
-    def get_user_data(self, user_uuid: str) -> bool:
+    def get_user_data(self, user_uuid: str) -> dict:
         uuid: str = str(uuid4())
         self.__send({"action": "user", "data": {"user": user_uuid}, "tag": uuid})
 
@@ -480,7 +480,10 @@ class MicroService:
         self._awaiting.remove(uuid)
 
         if response["valid"]:
-            return response["data"]
+            try:
+                return response["data"]
+            except KeyError as e:
+                self._sentry.capture_exception(e, user_uuid=user_uuid)
 
         else:
             return {"error": "invalid_user_uuid"}
