@@ -48,7 +48,7 @@ class Config:
         ("MYSQL_USERNAME", ""),
         ("MYSQL_PASSWORD", ""),
         ("RECYCLE_POOL", 1550),
-        ("PATH_LOGFILE", "log_files/"),
+        ("PATH_LOGFILE", ""),
         ("DSN", ""),  # Data Source Name ... needed for connecting to Sentry
         ("RELEASE", ""),
     ]
@@ -313,9 +313,8 @@ class MicroService:
                     if requirements is not None:
                         try:
                             requirements.serialize(data, "json")
-                        except:
+                        except Exception as e:
                             self._sentry.debug("invalid input data: " + str(data))
-
                             self.__send({"tag": tag, "data": {"error": "invalid_input_data"}})
                             return
 
@@ -454,6 +453,40 @@ class MicroService:
 
     def get_wrapper(self) -> "DatabaseWrapper":
         return self._database
+
+    def check_user_uuid(self, user_uuid: str) -> bool:
+        uuid: str = str(uuid4())
+        self.__send({"action": "user", "data": {"user": user_uuid}, "tag": uuid})
+
+        while uuid not in self._data.keys():
+            time.sleep(0.0001)
+
+        response: dict = self._data[uuid]
+
+        self._awaiting.remove(uuid)
+        del self._data[uuid]
+
+        return response["valid"]
+
+    def get_user_data(self, user_uuid: str) -> dict:
+        uuid: str = str(uuid4())
+        self.__send({"action": "user", "data": {"user": user_uuid}, "tag": uuid})
+
+        while uuid not in self._data.keys():
+            time.sleep(0.0001)
+
+        response: dict = self._data[uuid]
+
+        self._awaiting.remove(uuid)
+
+        if response["valid"]:
+            try:
+                return response["data"]
+            except KeyError as e:
+                self._sentry.capture_exception(e, user_uuid=user_uuid)
+
+        else:
+            return {"error": "invalid_user_uuid"}
 
 
 def get_config(mode: Optional[str] = None) -> Config:
