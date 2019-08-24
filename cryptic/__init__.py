@@ -267,7 +267,7 @@ class MicroService:
         if "tag" in frame and "data" in frame:
             data: dict = frame["data"]
             tag: str = frame["tag"]
-            endpoint: Tuple[str, ...] = tuple(frame["endpoint"])
+            endpoint: Tuple[str, ...] = tuple(frame["endpoint"]) if "endpoint" in frame else None
 
             if tag in self._awaiting:
                 self._data[tag] = data
@@ -456,6 +456,7 @@ class MicroService:
 
     def check_user_uuid(self, user_uuid: str) -> bool:
         uuid: str = str(uuid4())
+        self._awaiting.append(uuid)
         self.__send({"action": "user", "data": {"user": user_uuid}, "tag": uuid})
 
         while uuid not in self._data.keys():
@@ -470,6 +471,7 @@ class MicroService:
 
     def get_user_data(self, user_uuid: str) -> dict:
         uuid: str = str(uuid4())
+        self._awaiting.append(uuid)
         self.__send({"action": "user", "data": {"user": user_uuid}, "tag": uuid})
 
         while uuid not in self._data.keys():
@@ -481,7 +483,7 @@ class MicroService:
 
         if response["valid"]:
             try:
-                return response["data"]
+                return response
             except KeyError as e:
                 self._sentry.capture_exception(e, user_uuid=user_uuid)
 
