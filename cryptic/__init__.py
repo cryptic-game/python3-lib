@@ -275,7 +275,7 @@ class MicroService:
                 if "ms" in frame:
                     if endpoint not in self._ms_endpoints:
                         self._sentry.debug("ms requested: " + str(endpoint) + " Endpoint not found")
-                        self.__send({"tag": tag, "ms": frame["ms"], "data": {"error": "unknown_service"}})
+                        self.__send({"tag": tag, "ms": frame["ms"], "data": {"error": "unknown_endpoint"}})
                         return
 
                     requesting_microservice = frame["ms"]
@@ -304,7 +304,7 @@ class MicroService:
                 elif "user" in frame:
                     if endpoint not in self._user_endpoints:
                         self._sentry.debug("user requested: " + str(endpoint) + " Endpoint not found")
-                        self.__send({"tag": tag, "user": frame["user"], "data": {"error": "unknown_service"}})
+                        self.__send({"tag": tag, "user": frame["user"], "data": {"error": "unknown_endpoint"}})
                         return
 
                     self._database.ping()
