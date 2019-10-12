@@ -117,7 +117,7 @@ class Sentry(logging.Logger):
 
     def __setup_sentry(self) -> None:
         if _config["DSN"] != "":
-            sentry_sdk.init(dsn=_config["DSN"], release=_config["RELEASE"])
+            sentry_sdk.init(dsn=_config["DSN"], release=_config["RELEASE"], server_name="cryptic-" + self._name)
             self.__using_sentry = True
             logging.info("Setup SDK was performed DSN:", _config["DSN"])
 
