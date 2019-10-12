@@ -11,10 +11,11 @@ import logging
 import scheme
 from sqlalchemy import create_engine
 from sqlalchemy import select
+from sqlalchemy.engine import Connection
 from sqlalchemy.engine.base import Engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.ext.declarative.api import DeclarativeMeta
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.orm import sessionmaker, scoped_session
 
 import sentry_sdk
 from sentry_sdk import capture_exception, configure_scope
@@ -138,10 +139,9 @@ class DatabaseWrapper:
             _config["DBMS"] = "mysql"
 
         self.engine = None
-        self.session = None
+        self.SessionFactory = None
         self.Session = None
         self.Base = None
-        self.connection = None
 
         self.setup_database()
 
@@ -190,21 +190,25 @@ class DatabaseWrapper:
 
         # Because it returns a class
         # noinspection PyPep8Naming
-        self.Session: sessionmaker = sessionmaker(bind=self.engine)
+        self.SessionFactory: sessionmaker = sessionmaker(bind=self.engine)
         # The same here
         # noinspection PyPep8Naming
         self.Base: DeclarativeMeta = declarative_base()
-        self.session = self.Session()
-        self.connection = self.session.connection()
+        self.Session: scoped_session = scoped_session(self.SessionFactory)
+
+    @property
+    def session(self):
+        return self.Session()
 
     def reload(self) -> None:
-        self.Session = sessionmaker(bind=self.engine)
-        self.session = self.Session()
-        self.connection = self.session.connection()
+        self.SessionFactory = sessionmaker(bind=self.engine)
+        self.Session: scoped_session = scoped_session(self.SessionFactory)
 
     def ping(self) -> None:
         try:
-            self.connection.scalar(select([1]))
+            connection: Connection = self.session().connection()
+            connection.scalar(select([1]))
+            connection.close()
             return
         except Exception as e:
             self.reload()
@@ -316,6 +320,7 @@ class MicroService:
                         except Exception as e:
                             self._sentry.debug("invalid input data: " + str(data))
                             self.__send({"tag": tag, "data": {"error": "invalid_input_data"}})
+                            self._database.Session.close()
                             return
 
                     try:
@@ -334,6 +339,8 @@ class MicroService:
                             )
 
                     self.__send({"tag": tag, "data": return_data})
+
+                self._database.Session.close()
 
     def __start(self) -> NoReturn:
         while True:
