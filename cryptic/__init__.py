@@ -429,7 +429,6 @@ class MicroService:
 
                 for obj in objects:
                     try:
-                        print(".", end="")
                         frame: dict = json.loads(obj)
                         threading.Thread(target=self.__exec, args=(frame,)).start()
                     except json.JSONDecodeError as e:
