@@ -205,13 +205,8 @@ class DatabaseWrapper:
         self.Session: scoped_session = scoped_session(self.SessionFactory)
 
     def ping(self) -> None:
-        try:
-            connection: Connection = self.session().connection()
-            connection.scalar(select([1]))
-            connection.close()
-            return
-        except Exception as e:
-            self.reload()
+        connection: Connection = self.session.connection()
+        connection.scalar(select([1]))
 
 
 class MicroService:
@@ -284,7 +279,10 @@ class MicroService:
 
                     requesting_microservice = frame["ms"]
 
-                    self._database.ping()
+                    try:
+                        self._database.ping()
+                    except Exception as e:
+                        self._sentry.capture_exception(e, endpoint=endpoint, data=frame)
 
                     try:
                         return_data = self._ms_endpoints[endpoint](data, requesting_microservice)
@@ -311,7 +309,10 @@ class MicroService:
                         self.__send({"tag": tag, "user": frame["user"], "data": {"error": "unknown_endpoint"}})
                         return
 
-                    self._database.ping()
+                    try:
+                        self._database.ping()
+                    except Exception as e:
+                        self._sentry.capture_exception(e, endpoint=endpoint, data=frame)
 
                     requirements: scheme.Structure = self._user_endpoint_requirements[endpoint]
                     if requirements is not None:
