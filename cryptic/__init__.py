@@ -1,6 +1,7 @@
 import json
 import os
 import socket
+import string
 import threading
 import time
 from os import environ
@@ -34,6 +35,14 @@ class UnknownDBMSTypeError(ValueError):
 
 
 class UnknownModeError(ValueError):
+    pass
+
+
+class FrameTooLongError(RuntimeError):
+    pass
+
+
+class FrameCorruptedError(RuntimeError):
     pass
 
 
@@ -209,6 +218,68 @@ class DatabaseWrapper:
         connection.scalar(select([1]))
 
 
+class JSONReader:
+    MAX_LENGTH = 4096  # Object size limit: 4KB
+
+    def __init__(self):
+        self.buf = bytearray()
+        self.open_braces = 0
+        self.state = 0
+        self.inside_string = 0
+
+    def next(self, data: bytes) -> List[bytes]:
+        done_objects = []
+        if len(self.buf) > self.MAX_LENGTH:
+            self._reset()
+            raise FrameTooLongError(f"JSON object length exceeds {self.MAX_LENGTH} bytes: {self.buf}")
+
+        for pos in range(len(data)):
+            byte = data[pos]
+            if self.state == 1:
+                self._next_byte(data[pos], data, pos)
+                self.buf.append(byte)
+
+                if self.open_braces == 0:
+                    done_objects.append(self.buf)
+                    self._reset()
+            elif byte == ord('{'):
+                self.buf.append(byte)
+                self.open_braces = 1
+                self.state = 1  # decoding state
+            elif byte in bytes(string.whitespace, encoding="utf-8"):
+                pass
+            else:
+                raise FrameCorruptedError(f"Invalid JSON at position {pos}: {data}")
+
+        return done_objects
+
+    def _next_byte(self, byte: int, data: bytes, pos: int):
+        if byte == ord('{') and not self.inside_string:
+            self.open_braces += 1
+        elif byte == ord('}') and not self.inside_string:
+            self.open_braces -= 1
+        elif byte == ord('"'):
+            if not self.inside_string:
+                self.inside_string = True
+            else:
+                backslash_count = 0
+                pos_ = pos - 1
+                while pos_ >= 0:
+                    if data[pos_] == ord('\\'):
+                        backslash_count += 1
+                        pos_ -= 1
+                    else:
+                        break
+                if backslash_count % 2 == 0:
+                    self.inside_string = False
+
+    def _reset(self):
+        self.buf = bytearray()
+        self.inside_string = False
+        self.state = 0
+        self.open_braces = 0
+
+
 class MicroService:
     SERVICE_REQUEST_MAX_TIMEOUT = 10
 
@@ -221,6 +292,7 @@ class MicroService:
         self._awaiting = []
         self._data = {}
         self._database: DatabaseWrapper = DatabaseWrapper()
+        self._json_reader: JSONReader = JSONReader()
 
         if server_address is not None:
             assert len(server_address) == 2, "the server host tuple has to be like (str, int)"
@@ -345,24 +417,31 @@ class MicroService:
 
     def __start(self) -> NoReturn:
         while True:
+            data: bytes = b""
             try:
-                # assume all data coming from the server is well formatted
-                data: bytes = self.__sock.recv(4096)
+                data = self.__sock.recv(4096)
 
                 if len(data) == 0:
                     self.__reconnect()
                     continue
 
-                frame: dict = json.loads(data)
+                objects = self._json_reader.next(data)
 
-                threading.Thread(target=self.__exec, args=(frame,)).start()
-            except json.JSONDecodeError as e:
+                for obj in objects:
+                    try:
+                        print(".", end="")
+                        frame: dict = json.loads(obj)
+                        threading.Thread(target=self.__exec, args=(frame,)).start()
+                    except json.JSONDecodeError as e:
+                        self._sentry.debug("Error when trying to load json: " + str(data))
+                        self._sentry.capture_exception(e, data=str(data))
+                        continue
 
+            except (FrameCorruptedError, FrameTooLongError) as e:
                 self._sentry.debug("Error when trying to load json: " + str(data))
                 self._sentry.capture_exception(e, data=str(data))
                 continue
             except socket.error:
-
                 self._sentry.info("Lost connection to main server ... reconnect")
                 self.__reconnect()
                 continue
