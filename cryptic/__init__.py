@@ -393,7 +393,7 @@ class MicroService:
                         except Exception as e:
                             self._sentry.debug("invalid input data: " + str(data))
                             self.__send({"tag": tag, "data": {"error": "invalid_input_data"}})
-                            self._database.Session.close()
+                            self._database.Session.remove()
                             return
 
                     try:
@@ -413,7 +413,7 @@ class MicroService:
 
                     self.__send({"tag": tag, "data": return_data})
 
-                self._database.Session.close()
+                self._database.Session.remove()
 
     def __start(self) -> NoReturn:
         while True:
