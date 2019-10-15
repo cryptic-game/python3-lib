@@ -57,7 +57,6 @@ class Config:
         ("MYSQL_DATABASE", ""),
         ("MYSQL_USERNAME", ""),
         ("MYSQL_PASSWORD", ""),
-        ("RECYCLE_POOL", 1550),
         ("PATH_LOGFILE", ""),
         ("DSN", ""),  # Data Source Name ... needed for connecting to Sentry
         ("RELEASE", ""),
@@ -170,7 +169,7 @@ class DatabaseWrapper:
     def __setup_mysql(username: str, password: str, hostname: str, port: int, database: str) -> Engine:
         assert 0 < port <= 65535, "invalid port number"
         return create_engine(
-            f"mysql+pymysql://{username}:{password}@{hostname}:{port}/{database}", pool_recycle=_config["RECYCLE_POOL"]
+            f"mysql+pymysql://{username}:{password}@{hostname}:{port}/{database}", pool_pre_ping=True
         )
 
     def setup_database(self) -> None:
