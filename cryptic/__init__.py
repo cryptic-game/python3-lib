@@ -208,14 +208,6 @@ class DatabaseWrapper:
     def session(self):
         return self.Session()
 
-    def reload(self) -> None:
-        self.SessionFactory = sessionmaker(bind=self.engine)
-        self.Session: scoped_session = scoped_session(self.SessionFactory)
-
-    def ping(self) -> None:
-        connection: Connection = self.session.connection()
-        connection.scalar(select([1]))
-
 
 class JSONReader:
     MAX_LENGTH = 4096  # Object size limit: 4KB
@@ -351,11 +343,6 @@ class MicroService:
                     requesting_microservice = frame["ms"]
 
                     try:
-                        self._database.ping()
-                    except Exception as e:
-                        self._sentry.capture_exception(e, endpoint=endpoint, data=frame)
-
-                    try:
                         return_data = self._ms_endpoints[endpoint](data, requesting_microservice)
 
                     except Exception as e:
@@ -379,11 +366,6 @@ class MicroService:
                         self._sentry.debug("user requested: " + str(endpoint) + " Endpoint not found")
                         self.__send({"tag": tag, "user": frame["user"], "data": {"error": "unknown_endpoint"}})
                         return
-
-                    try:
-                        self._database.ping()
-                    except Exception as e:
-                        self._sentry.capture_exception(e, endpoint=endpoint, data=frame)
 
                     requirements: scheme.Structure = self._user_endpoint_requirements[endpoint]
                     if requirements is not None:
