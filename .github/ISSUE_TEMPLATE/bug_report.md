@@ -1,33 +1,52 @@
 ---
 name: Bug report
 about: Create a report to help us improve
-
 ---
 
-**_IMPORTANT_: If the bug report is some kind of security issue, please report it directly to one of the members of the cryptic-game organisation to prevent abuse.**
+<!--
 
-**Describe the bug**
-A clear and concise description of what the bug is.
+**!** If the bug report is some kind of security issue, please report it directly to one of the members of the cryptic-game organisation to prevent abuse.
 
-**To Reproduce**
-Steps to reproduce the behavior:
+-->
+
+## Description
+
+<!--- A clear and concise description of what the bug is. -->
+
+
+## To Reproduce
+
+<!--
+
+Please provide steps to reproduce the behavior.
+
+e.g.
 1. Go to '...'
 2. Click on '....'
 3. Scroll down to '....'
 4. See error
 
-**Expected behavior**
-A clear and concise description of what you expected to happen.
+-->
 
-**Screenshots**
-If applicable, add screenshots to help explain your problem.
+## Expected behavior
 
-**Desktop (please complete the following information):**
- - OS: [e.g. MacOS, Linux Mint Tara]
+<!--- A clear and concise description of what you expected to happen. -->
+
+
+## Screenshots (if appropriate)
+
+## System
+
+<!--
+
+We need the following information:
+ - OS: [e.g. macOS Catalina, Linux Mint Tina]
  - Python Version [e.g. python 2.7, python 3.7]
 
-**Solution**
-If you found a solution already, give a short explanation of how you want to fix this bug. If you want to fix it yourself, consider forking and creating a pull request.
+-->
 
-**Additional context**
-Add any other context about the problem here.
+<!--
+## Solution
+If you found a solution already, give a short explanation of how you would fix this bug. 
+If you want to fix it yourself, consider forking this repository and creating a pull request.
+-->

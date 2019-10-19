@@ -10,7 +10,7 @@ if os.path.isfile(requirementPath):
 
 
 with open("./README.md", "r") as f:
-    file: str = f.read()
+    readme_file: str = f.read()
 
 setup(
     name="cryptic-game",
@@ -18,7 +18,7 @@ setup(
     description="Microservice handler for cryptic-game",
     author="cryptic-game",
     author_email="faq@cryptic-game.net",
-    long_description=file,
+    long_description=readme_file,
     long_description_content_type="text/markdown",
     url="https://github.com/cryptic-game/python3-lib",
     packages=find_packages(),
