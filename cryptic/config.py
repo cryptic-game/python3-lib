@@ -7,7 +7,7 @@ class Config:
         "SERVER_HOST": "127.0.0.1",  # Hostname of the main server
         "SERVER_PORT": "1239",       # Port of the main server
         "DATA_LOCATION": "data/",
-        "DBMS": "sqlite",            # Available: mysql and sqlite
+        "DBMS": "mysql",            # Available: mysql and sqlite
         "SQLITE_FILE": "data.db",    # Filename of the sqlite database if DBMS is sqlite
         "MYSQL_HOSTNAME": "",        # As MySQL is not the default, we don't need default values
         "MYSQL_PORT": "",
