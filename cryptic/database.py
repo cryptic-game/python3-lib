@@ -6,8 +6,8 @@ from sqlalchemy.engine import Engine
 from sqlalchemy.ext.declarative import DeclarativeMeta, declarative_base
 from sqlalchemy.orm import sessionmaker, scoped_session
 
-from errors import UnknownDBMSTypeError
-from config import Config
+from cryptic.errors import UnknownDBMSTypeError
+from cryptic.config import Config
 
 
 class DatabaseWrapper:

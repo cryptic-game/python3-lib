@@ -1,7 +1,7 @@
 import string
 from typing import List
 
-from errors import FrameTooLongError, FrameCorruptedError
+from cryptic.errors import FrameTooLongError, FrameCorruptedError
 
 
 class JSONReader:

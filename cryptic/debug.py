@@ -3,7 +3,7 @@ import logging
 
 import sentry_sdk
 
-from config import Config
+from cryptic.config import Config
 
 
 class _SentryLogRedirect:

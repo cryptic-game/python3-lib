@@ -7,11 +7,11 @@ from typing import Tuple, Dict, Callable, Union, List, Optional
 import scheme
 from uuid import uuid4
 
-from config import Config
-from errors import FrameCorruptedError, FrameTooLongError, IllegalReturnTypeError
-from database import DatabaseWrapper
-from debug import Debug
-from jsonreader import JSONReader
+from cryptic.config import Config
+from cryptic.errors import FrameCorruptedError, FrameTooLongError, IllegalReturnTypeError
+from cryptic.database import DatabaseWrapper
+from cryptic.debug import Debug
+from cryptic.jsonreader import JSONReader
 
 
 class MicroService:
