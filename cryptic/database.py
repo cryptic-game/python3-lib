@@ -1,6 +1,7 @@
 import os
 
 import sqlalchemy
+
 # noinspection PyProtectedMember
 from sqlalchemy.engine import Engine
 from sqlalchemy.ext.declarative import DeclarativeMeta, declarative_base

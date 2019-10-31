@@ -28,7 +28,7 @@ class JSONReader:
                 if self.open_braces == 0:
                     done_objects.append(self.buf)
                     self._reset()
-            elif byte == ord('{'):
+            elif byte == ord("{"):
                 self.buf.append(byte)
                 self.open_braces = 1
                 self.state = 1  # decoding state
@@ -40,9 +40,9 @@ class JSONReader:
         return done_objects
 
     def _next_byte(self, byte: int, data: bytes, pos: int):
-        if byte == ord('{') and not self.inside_string:
+        if byte == ord("{") and not self.inside_string:
             self.open_braces += 1
-        elif byte == ord('}') and not self.inside_string:
+        elif byte == ord("}") and not self.inside_string:
             self.open_braces -= 1
         elif byte == ord('"'):
             if not self.inside_string:
@@ -51,7 +51,7 @@ class JSONReader:
                 backslash_count = 0
                 pos_ = pos - 1
                 while pos_ >= 0:
-                    if data[pos_] == ord('\\'):
+                    if data[pos_] == ord("\\"):
                         backslash_count += 1
                         pos_ -= 1
                     else:

@@ -116,8 +116,9 @@ class MicroService:
                 continue
 
     def __exec(self, frame):
-        if not ("tag" in frame and "data" in frame) or \
-                not (isinstance(frame["tag"], str) and isinstance(frame["data"], dict)):
+        if not ("tag" in frame and "data" in frame) or not (
+            isinstance(frame["tag"], str) and isinstance(frame["data"], dict)
+        ):
             self.debug.warning(f"Got an unknown request: {json.dumps(frame)}")
             return
 

@@ -1,4 +1,3 @@
-import json
 import logging
 
 import sentry_sdk
@@ -18,10 +17,9 @@ class _SentryLogRedirect:
         self._buf = ""
 
 
-class _SentryLogFilter:
-    @staticmethod
-    def filter(record):
-        return not(hasattr(record, "NO_SENTRY") and record.NO_SENTRY)
+class _SentryLogFilter(logging.Filter):
+    def filter(self, record):
+        return not (hasattr(record, "NO_SENTRY") and record.NO_SENTRY)
 
 
 class Debug(logging.Logger):
@@ -44,7 +42,7 @@ class Debug(logging.Logger):
         if self.__using_sentry:
             sentry_handler = logging.StreamHandler(_SentryLogRedirect())
             sentry_handler.setLevel(logging.WARNING)
-            sentry_handler.addFilter(_SentryLogFilter)
+            sentry_handler.addFilter(_SentryLogFilter())
             self.addHandler(sentry_handler)
 
         console_handler = logging.StreamHandler()
@@ -55,16 +53,16 @@ class Debug(logging.Logger):
 
     def __setup_sentry(self):
         if self._config["DSN"] != "":
-            sentry_sdk.init(dsn=self._config["DSN"], release=self._config["RELEASE"],
-                            server_name="cryptic-" + self._name)
+            sentry_sdk.init(
+                dsn=self._config["DSN"], release=self._config["RELEASE"], server_name="cryptic-" + self._name
+            )
             self.__using_sentry = True
 
     def capture_exception(self, e: Exception, **kwargs):
-        self.exception(e, extra=dict(NO_SENTRY=True))
-        if kwargs:
-            self.error(f"-> Additional information: {json.dumps(kwargs)}", extra=dict(NO_SENTRY=True))
         if self.__using_sentry:
             with sentry_sdk.push_scope() as scope:
                 for key in kwargs:
                     scope.set_extra(key, kwargs[key])
                 sentry_sdk.capture_exception(e)
+
+        self.exception(e, extra=dict(NO_SENTRY=True))
