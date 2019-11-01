@@ -1,8 +1,8 @@
 # python3-lib
 
-The microservice-libary for python3 of cryptic-game.
+The library that is used for microservices of the backend for the Cryptic game that are written in Python.
 
-Pypi Seite: https://pypi.org/project/cryptic-game/
+PyPI package: https://pypi.org/project/cryptic-game/
 
 ## Installation:
 
@@ -12,35 +12,38 @@ $ pip3 install cryptic-game
 
 ## Features
 
-- Endpoint Mapping
-- automatic input validation
-- Database Control
-- Sentry and Logger -> Stacktraces and Context Data
+- Endpoint mapping
+- Automatic input validation
+- Database control with SQLAlchemy
+- Automatic error capturing with Sentry and a logger
 
 ## Quick Start
 
-Checkout the [example.py](https://github.com/cryptic-game/python3-lib/blob/master/example.py) for an quick example how this library is used.
+Checkout [example.py](https://github.com/cryptic-game/python3-lib/blob/master/example.py) 
+for a quick example on how this library is used.
 
 ## Requirements
 
-Required are all modules in the `requirements.txt`.
+Required are all modules in the `requirements.txt` (which will automatically be installed by pip).
 
-## Enviroment Variables
+## Environment Variables
 
-| Variable                      | Functionality                                                 |
-|-------------------------------|---------------------------------------------------------------|
-| MODE                          | debug or production                                           |
-| DATA_LOCATION                 | Path where you sqlite db should be stored under debug mode    |
-| DBMS                          | Mysql or sqlite used internaly                                |
-| SQLITE_FILE                   | Name of your sqlite db                                        |
-| MYSQL_HOSTNAME                | Host where your mysql server runs                             |
-| MYSQL_PORT                    | Under which port your mysql on the given host runs            |
-| MYSQL_DATABASE                | Name of your mysql database                                   |
-| MYSQL_USERNAME                | Mysql username                                                |
-| MYSQL_PASSWORD                | Your password for this given user                             |
-| PATH_LOGFILE                  | Path too where your logging files should be stored            |
-| DSN                           | Data Structure Name for your sentry instance                  |
-| RELEASE                       | The Release this will be reported too sentry                  |
+| Variable            | Functionality                                                  |
+|---------------------|----------------------------------------------------------------|
+| MODE                | Available: debug and production                                |
+| SERVER_HOST         | Hostname of the main server                                    |
+| SERVER_PORT         | Microservice communication port of the main server             |
+| DATA_LOCATION       | SQLite database file location                                  |
+| DBMS                | Database management system; Available: mysql and sqlite        |
+| SQLITE_FILE         | Name of the SQLite database file (only used if DBMS is sqlite) |
+| MYSQL_HOSTNAME      | Hostname of the MySQL server                                   |
+| MYSQL_PORT          | Port of the MySQL server                                       |
+| MYSQL_DATABASE      | Name of the MySQL database to use                              |
+| MYSQL_USERNAME      | MySQL username to use                                          |
+| MYSQL_PASSWORD      | The password of the MySQL user                                 |
+| PATH_LOGFILE        | Path where your log-files will be stored to                    |
+| DSN                 | "Data Source Name" of your Sentry instance                     |
+| RELEASE             | The release that will be reported to Sentry                    |
 
 
 ## Test it!

@@ -1,31 +1,29 @@
-from cryptic import MicroService, get_config, Config
+from cryptic import MicroService
 from uuid import uuid4
 from sqlalchemy import Column, String
-from typing import Union, Dict
+from typing import Union
 from scheme import Text, UUID
 
-config: Config = get_config("debug")  # this sets config to debug mode
-ms: MicroService = MicroService(name="echo")
+ms: MicroService = MicroService(name="test")
 db_wrapper = ms.get_wrapper()
 
-requirement: Dict[str, Text] = {"your_pets_name": Text(required=True), "wallet": UUID()}
+user_scheme = {"your_pets_name": Text(required=True), "wallet": UUID()}
 
 
 @ms.microservice_endpoint(path=["microservice"])
 def handle(data: dict, microservice: str):
-    return {"myname": "microservice"}
+    return {"my_name": "microservice"}
 
 
-@ms.user_endpoint(path=["user"], requires=requirement)
+@ms.user_endpoint(path=["user"], requires=user_scheme)
 def handle(data: dict, user: str):
     can_pay: bool = ms.contact_microservice("currency", ["exists"], {"source_uuid": data["wallet"]})["exists"]
-
     if can_pay:
-        mypet: Test = Test.create(data["your_pets_name"])
+        my_pet: Test = Test.create(data["your_pets_name"])
 
-        return {"uuid": mypet.uuid}
+        return {"uuid": my_pet.uuid}
     else:
-        return {"error": "you_need_a_valid_wallet"}
+        return {"error": "valid_wallet_required"}
 
 
 class Test(db_wrapper.Base):
@@ -45,4 +43,5 @@ class Test(db_wrapper.Base):
 
 
 if __name__ == "__main__":
+    db_wrapper.Base.metadata.create_all(bind=db_wrapper.engine)
     ms.run()
