@@ -14,7 +14,7 @@ with open("./README.md", "r") as f:
 
 setup(
     name="cryptic-game",
-    version="0.5.0.dev0",
+    version="0.5.1.dev0",
     description="Microservice handler for cryptic-game",
     author="cryptic-game",
     author_email="faq@cryptic-game.net",
