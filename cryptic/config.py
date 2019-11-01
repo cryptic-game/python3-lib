@@ -9,11 +9,11 @@ class Config:
         "DATA_LOCATION": "data/",
         "DBMS": "mysql",  # Available: mysql and sqlite
         "SQLITE_FILE": "data.db",  # Filename of the sqlite database if DBMS is sqlite
-        "MYSQL_HOSTNAME": "",  # As MySQL is not the default, we don't need default values
-        "MYSQL_PORT": "",
-        "MYSQL_DATABASE": "",
-        "MYSQL_USERNAME": "",
-        "MYSQL_PASSWORD": "",
+        "MYSQL_HOSTNAME": "localhost",
+        "MYSQL_PORT": "3306",
+        "MYSQL_DATABASE": "cryptic",
+        "MYSQL_USERNAME": "cryptic",
+        "MYSQL_PASSWORD": "cryptic",
         "PATH_LOGFILE": "./",
         "DSN": "",  # Data Source Name; needed for connecting to Sentry
         "RELEASE": "",  # The release that will be reported to Sentry
