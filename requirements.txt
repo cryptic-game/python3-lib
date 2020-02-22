@@ -1,5 +1,5 @@
 uuid
 SQLAlchemy
 PyMySQL
-scheme
+pyscheme
 sentry_sdk
