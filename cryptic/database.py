@@ -6,6 +6,7 @@ import sqlalchemy
 from sqlalchemy.engine import Engine
 from sqlalchemy.ext.declarative import DeclarativeMeta, declarative_base
 from sqlalchemy.orm import sessionmaker, scoped_session
+from urllib.parse import quote_plus
 
 from cryptic.errors import UnknownDBMSTypeError
 from cryptic.config import Config
@@ -32,7 +33,7 @@ class DatabaseWrapper:
     def __setup_mysql(username: str, password: str, hostname: str, port: int, database: str) -> Engine:
         assert 0 < port <= 65535, "Invalid port number"
         return sqlalchemy.create_engine(
-            f"mysql+pymysql://{username}:{password}@{hostname}:{port}/{database}", pool_pre_ping=True
+            f"mysql+pymysql://{quote_plus(username)}:{quote_plus(password)}@{hostname}:{port}/{database}", pool_pre_ping=True
         )
 
     def _setup_database(self):
